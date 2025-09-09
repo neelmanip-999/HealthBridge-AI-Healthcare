@@ -28,8 +28,8 @@ const Footer = () => {
                 <div>
                     <p className='text-xl font-medium mb-5'>GET IN TOUCH</p>
                     <ul className='flex flex-col gap-2 text-gray-600'>
-                        <li>+1-212-456-7890</li>
-                        <li>anyemailid@email.com</li>
+                        <li>74666666666</li>
+                        <li>nikhilchahar@email.com</li>
                     </ul>
 
                 </div>
@@ -37,7 +37,7 @@ const Footer = () => {
             {/* ---- Copyright text------- */}
             <div>
                 <hr/>
-                <p className='py-5 text-sm text-center'>Copyright 2025@ Precripto - All Right Reserved</p>
+                <p className='py-5 text-sm text-center'>Copyright 2025@ HealthBridge - All Right Reserved</p>
             </div>
         </div>
     )

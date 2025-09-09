@@ -5,16 +5,16 @@ import {assets} from '../assets/assets_frontend/assets'
 const MyProfile = () => {
 
     const [userData,setUserData] = useState({
-        name :" Vishnukant Bagri",
+        name :" NEELMANI PANDEY",
         image: assets.profile_pic,
-        email:"vishnukantbagri@gmail.com",
-        phone: '+ 84 3553 0071',
+        email:"neelmanipandey22@gmail.com",
+        phone: '+8865841975',
         address:{
-            line1: "57th Cross,satna",
-            line2: "Circle,Dhawari Road,London"
+            line1: "Vrindavan",
+            line2: "Mathura, Uttar Pradesh"
         },
         gender :'Male',
-        dob: '2004-05-04'
+        dob: '2005-05-09'
     })
 
     const [isEdit, setIsEdit]  = useState(false)

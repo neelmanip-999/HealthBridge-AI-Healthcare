@@ -16,10 +16,10 @@ const App = () => {
     <div className='mx-4 sm:mx-[10%]'>
       <Navigation/>
       <Routes>
-        <Route path='/home' element={<Home/>} />
+        <Route path='/' element={<Home/>} />
         <Route path='/doctors' element={<Doctor/>} />
         <Route path='/doctors/:speciality' element={<Doctor/>} />
-        <Route path='/' element={<Login/>} />
+        <Route path='/login' element={<Login/>} />
         <Route path='/about' element={<About/>} />
         <Route path='/contact' element={<Contact/>} />
         <Route path='/my-profile' element={<Myprofile/>} />

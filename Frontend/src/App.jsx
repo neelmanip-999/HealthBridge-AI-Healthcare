@@ -1,34 +1,35 @@
-import React from 'react'
-import { Route, Routes } from 'react-router-dom'
-import Home from './pages/Home'
-import Doctor from './pages/Doctor'
-import Login from './pages/Login'
-import About from './pages/About'
-import Contact from './pages/Contact'
-import Myprofile from './pages/Myprofile'
-import MyAppointments from './pages/MyAppointments'
-import Appointment from './pages/Appointment'
-import Navigation from './components/Navigation'
-import Footer from './components/Footer'
+import React, { useContext } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import LoginPage from './components/auth/LoginPage';
+import PatientDashboard from './components/patient/PatientDashboard';
+import DoctorDashboard from './components/doctor/DoctorDashboard';
+import PharmacyDashboard from './components/pharmacy/PharmacyDashboard';
+import Navbar from './components/shared/Navbar';
+import ProtectedRoute from './components/shared/ProtectedRoute';
+import { AuthContext } from './context/AuthContext';
 
-const App = () => {
+export default function App() {
+  const { user } = useContext(AuthContext);
+
   return (
-    <div className='mx-4 sm:mx-[10%]'>
-      <Navigation/>
-      <Routes>
-        <Route path='/' element={<Home/>} />
-        <Route path='/doctors' element={<Doctor/>} />
-        <Route path='/doctors/:speciality' element={<Doctor/>} />
-        <Route path='/login' element={<Login/>} />
-        <Route path='/about' element={<About/>} />
-        <Route path='/contact' element={<Contact/>} />
-        <Route path='/my-profile' element={<Myprofile/>} />
-        <Route path='/my-appointments' element={<MyAppointments/>} />
-        <Route path='/appointment/:docId' element={<Appointment/>} />
-      </Routes>
-      <Footer/>
-    </div>
-  )
+    <Router>
+      <Navbar />
+      <div className="container mx-auto p-4">
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/" element={
+            user ? (
+              user.role === 'patient' ? <Navigate to="/patient" /> :
+              user.role === 'doctor' ? <Navigate to="/doctor" /> :
+              <Navigate to="/pharmacy" />
+            ) : <Navigate to="/login" />
+          } />
+          <Route path="/patient/*" element={<ProtectedRoute allowedRoles={['patient']}><PatientDashboard/></ProtectedRoute>} />
+          <Route path="/doctor/*" element={<ProtectedRoute allowedRoles={['doctor']}><DoctorDashboard/></ProtectedRoute>} />
+          <Route path="/pharmacy/*" element={<ProtectedRoute allowedRoles={['pharmacy']}><PharmacyDashboard/></ProtectedRoute>} />
+          <Route path="*" element={<div>404 - Not Found</div>} />
+        </Routes>
+      </div>
+    </Router>
+  );
 }
-
-export default App

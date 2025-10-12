@@ -1,31 +1,5 @@
-
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&family=Outfit:wght@100..900&family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&display=swap');
-
-@import "tailwindcss";
-
-@theme{
-    --color-primary: #5f6FFF;
-    /* --grid-Cols-auto: repeat(auto-fill, minmax(200px, 1fr)); */
-}
-
-*{
-    font-family: Outfit;
-}
-:root{
-    --my-grid-column: repeat(auto-fill, minmax(200px, 1fr));
-}
-
-.active hr{
-    @apply block;
-}
-
-::-webkit-scrollbar{
-    @apply hidden
-}
-
-
-@media (max-width: 740px){
-    .active p{
-        @apply text-white bg-primary;
-    }
-}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+body { background: #f7fafc; }
+.container { max-width: 1100px; margin: 0 auto; }

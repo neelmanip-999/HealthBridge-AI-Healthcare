@@ -1,0 +1,1 @@
+Frontend for HealthBridge. Run `npm install` then `npm run start` (vite)

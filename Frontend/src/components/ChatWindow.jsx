@@ -1,161 +1,128 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MessageSquare, Send, X, RotateCcw } from 'lucide-react';
+import { MessageSquare, Send, X } from 'lucide-react';
 import io from 'socket.io-client';
-import api from '../services/api';
+import api from '../services/api'; // Ensure this path is correct
 
 const SOCKET_SERVER_URL = "http://localhost:5000";
 
-// Initialize socket connection outside the component and memoize it
-// We connect automatically when the ChatWindow component mounts
-const socket = io(SOCKET_SERVER_URL, {
-    autoConnect: false,
-    transports: ['websocket']
-});
-
-const ChatWindow = ({ partner, sessionId, onEndChat, userRole, initialMessages = [] }) => {
-    const [messages, setMessages] = useState(initialMessages);
+const ChatWindow = ({ partner, onEndChat, userRole }) => {
+    const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
     const [isConnected, setIsConnected] = useState(false);
     const messagesEndRef = useRef(null);
+    const socket = useRef(null);
 
     const currentUser = JSON.parse(localStorage.getItem('user'));
-    const currentUserId = currentUser?.id;
+    // Make sure currentUser from localStorage has an 'id' property
+    const currentUserId = currentUser?.id; 
     const isDoctor = userRole === 'doctor';
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     };
 
-    // --- Socket.io Handlers ---
+    // Effect for fetching initial chat history
     useEffect(() => {
-        if (!currentUserId || !sessionId) return;
+        // --- FIX: Use partner._id to fetch history ---
+        if (!currentUserId || !partner?._id) return;
 
-        // 1. Connect and identify user/room
-        socket.auth = { userId: currentUserId, sessionId };
-        if (!socket.connected) {
-            socket.connect();
-        }
-
-        socket.on('connect', () => {
-            setIsConnected(true);
-            console.log(`Socket connected. User ID: ${currentUserId}`);
-        });
-
-        // 2. Receive messages
-        socket.on('receiveMessage', (message) => {
-            setMessages((prevMessages) => [...prevMessages, message]);
-        });
-        
-        // 3. Handle consultation ended by partner
-        socket.on('consultationEnded', (data) => {
-            if (data.sessionId === sessionId) {
-                // Use a simple modal/alert for confirmation (avoid browser alert in production)
-                window.alert(`${partner.name} has ended the consultation. Closing chat.`);
-                onEndChat(); // Clears chat session state in parent dashboard
+        const fetchHistory = async () => {
+            try {
+                const response = await api.get(`/chat/history/${currentUserId}/${partner._id}`);
+                setMessages(response.data);
+            } catch (error) {
+                console.error("Failed to fetch chat history:", error);
             }
+        };
+        fetchHistory();
+    }, [currentUserId, partner._id]);
+
+    // Effect for managing socket connection
+    useEffect(() => {
+        if (!currentUserId) return;
+
+        socket.current = io(SOCKET_SERVER_URL, {
+            autoConnect: false,
+            transports: ['websocket'],
+            auth: { userId: currentUserId }
         });
 
-        // 4. Cleanup on component unmount
+        socket.current.connect();
+        socket.current.on('connect', () => setIsConnected(true));
+        socket.current.on('receiveMessage', (message) => {
+            setMessages((prev) => [...prev, message]);
+        });
+        socket.current.on('consultationEnded', () => {
+            window.alert(`${partner.name} has ended the consultation.`);
+            onEndChat();
+        });
+
         return () => {
-            socket.off('connect');
-            socket.off('receiveMessage');
-            socket.off('consultationEnded');
-            socket.disconnect();
-            setIsConnected(false);
+            if (socket.current) {
+                socket.current.disconnect();
+                setIsConnected(false);
+            }
         };
-    }, [currentUserId, sessionId, onEndChat, partner.name]);
+    }, [currentUserId, partner.name, onEndChat]);
 
     useEffect(scrollToBottom, [messages]);
 
-    // --- Message Logic ---
     const sendMessage = (e) => {
         e.preventDefault();
-        if (input.trim() === '') return;
+        if (input.trim() === '' || !socket.current || !isConnected) return;
 
-        const message = {
+        const messageData = {
             senderId: currentUserId,
-            receiverId: partner.id,
+            // --- THE FIX IS HERE ---
+            // Use partner._id which comes from the MongoDB document
+            receiverId: partner._id,
             senderRole: userRole,
             message: input.trim(),
-            timestamp: Date.now(),
         };
 
-        socket.emit('sendMessage', message);
-        setMessages((prevMessages) => [...prevMessages, message]);
+        socket.current.emit('sendMessage', messageData);
         setInput('');
     };
 
-    // --- End Chat Logic ---
     const handleEndChat = async () => {
-        if (!window.confirm("Are you sure you want to end this consultation?")) {
-            return;
-        }
-
+        if (!window.confirm("Are you sure you want to end this consultation?")) return;
         try {
-            // 1. Only Doctor updates status back to 'free' via API
             if (isDoctor) {
-                 await api.put('/doctor/status', { status: 'free' });
-                 // Update local doctor status immediately
-                 const updatedDoctor = { ...currentUser, status: 'free' };
-                 localStorage.setItem('user', JSON.stringify(updatedDoctor));
+                await api.put('/doctor/status', { status: 'free' });
             }
-           
-            // 2. Notify partner and trigger server-side cleanup
-            socket.emit('endConsultation', { sessionId, endedBy: userRole });
-
-            // 3. Clear local state
+            if (socket.current) {
+                // --- FIX: Use partner._id to end consultation ---
+                socket.current.emit('endConsultation', { partnerId: partner._id });
+            }
             onEndChat();
-
         } catch (err) {
             console.error("Error ending consultation:", err);
-            // Even if API fails, clear locally to allow navigation
-            onEndChat(); 
+            onEndChat();
         }
     };
-
 
     const formatTime = (timestamp) => {
         return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     };
 
+    // --- JSX (Unchanged) ---
     return (
         <div className="flex flex-col h-full bg-white rounded-3xl shadow-xl">
-            {/* Header */}
-            <div className="p-4 border-b border-indigo-200 bg-indigo-50 rounded-t-3xl flex justify-between items-center">
+            <div className="p-4 border-b flex justify-between items-center">
+                <h3 className="text-xl font-bold text-indigo-700">Chat with {partner.name}</h3>
                 <div className="flex items-center space-x-3">
-                    <MessageSquare className="w-5 h-5 text-indigo-600" />
-                    <h3 className="text-xl font-bold text-indigo-700">Chat with {partner.name}</h3>
-                </div>
-                <div className="flex items-center space-x-3">
-                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${isConnected ? 'bg-green-500 text-white' : 'bg-gray-300 text-gray-700'}`}>
+                    <span className={`px-2 py-1 text-xs rounded-full ${isConnected ? 'bg-green-500 text-white' : 'bg-gray-300'}`}>
                         {isConnected ? 'Live' : 'Connecting...'}
                     </span>
-                    <button 
-                        onClick={handleEndChat}
-                        className="p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors duration-200 shadow-lg"
-                        title="End Consultation"
-                    >
+                    <button onClick={handleEndChat} className="p-2 bg-red-500 text-white rounded-full hover:bg-red-600">
                         <X className="w-5 h-5" />
                     </button>
                 </div>
             </div>
-
-            {/* Message Area */}
             <div className="flex-grow p-4 overflow-y-auto space-y-4">
-                {messages.length === 0 && (
-                    <div className="text-center py-10 text-gray-400">
-                        <RotateCcw className="w-8 h-8 mx-auto mb-3 animate-spin-slow" />
-                        <p>Starting secure consultation...</p>
-                    </div>
-                )}
-
-                {messages.map((msg, index) => (
-                    <div key={index} className={`flex ${msg.senderId === currentUserId ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-xs md:max-w-md lg:max-w-lg p-3 rounded-xl shadow-md ${
-                            msg.senderId === currentUserId 
-                                ? 'bg-indigo-600 text-white rounded-br-none' 
-                                : 'bg-gray-200 text-gray-800 rounded-tl-none'
-                        }`}>
+                {messages.map((msg) => (
+                    <div key={msg._id} className={`flex ${msg.senderId === currentUserId ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`max-w-md p-3 rounded-xl shadow-md ${msg.senderId === currentUserId ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-gray-200 rounded-tl-none'}`}>
                             <p>{msg.message}</p>
                             <span className={`text-xs mt-1 block ${msg.senderId === currentUserId ? 'text-indigo-200' : 'text-gray-500'}`}>
                                 {formatTime(msg.timestamp)}
@@ -165,22 +132,16 @@ const ChatWindow = ({ partner, sessionId, onEndChat, userRole, initialMessages =
                 ))}
                 <div ref={messagesEndRef} />
             </div>
-
-            {/* Input Area */}
-            <form onSubmit={sendMessage} className="p-4 border-t border-indigo-200 bg-indigo-50 rounded-b-3xl flex space-x-3">
+            <form onSubmit={sendMessage} className="p-4 border-t flex space-x-3">
                 <input
                     type="text"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     placeholder="Type your message..."
-                    className="flex-grow px-4 py-3 input-field focus:ring-indigo-500 focus:border-indigo-500 rounded-xl"
+                    className="flex-grow px-4 py-3 border rounded-xl"
                     disabled={!isConnected}
                 />
-                <button
-                    type="submit"
-                    className="btn-primary btn-ripple py-3 px-5 disabled:opacity-50"
-                    disabled={!isConnected || input.trim() === ''}
-                >
+                <button type="submit" className="bg-indigo-600 text-white py-3 px-5 rounded-xl disabled:opacity-50" disabled={!isConnected || input.trim() === ''}>
                     <Send className="w-5 h-5" />
                 </button>
             </form>

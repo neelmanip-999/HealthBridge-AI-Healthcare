@@ -1,63 +1,123 @@
-const User = require('../models/User');
-const Appointment = require('../models/Appointment');
-const asyncHandler = require('express-async-handler');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+// FIX: Ensure the import correctly references the Mongoose model. 
+// If Doctor.js uses module.exports = mongoose.model(...), this is correct.
+const Doctor = require('../models/Doctor'); 
+const { doctorRegisterValidation, doctorLoginValidation } = require('../validations/doctorValidation');
 
-const getAllDoctors = asyncHandler(async (req, res) => {
-  const { specialization, city, minFee, maxFee } = req.query;
-  let query = { role: 'doctor', isActive: true };
-  if (specialization) query['doctorDetails.specialization'] = new RegExp(specialization,'i');
-  if (city) query['doctorDetails.city'] = new RegExp(city,'i');
-  if (minFee || maxFee) {
-    query['doctorDetails.consultationFee'] = {};
-    if (minFee) query['doctorDetails.consultationFee'].$gte = Number(minFee);
-    if (maxFee) query['doctorDetails.consultationFee'].$lte = Number(maxFee);
+// Shared function to generate JWT
+const generateToken = (id) => {
+  return jwt.sign({ id, role: 'doctor' }, process.env.JWT_SECRET, {
+    expiresIn: '1d', // Token expires in 1 day
+  });
+};
+
+// POST /doctor/register
+exports.registerDoctor = async (req, res) => {
+  // 1. Validate input with Joi
+  const { error } = doctorRegisterValidation.validate(req.body);
+  if (error) return res.status(400).send({ message: error.details[0].message });
+
+  try {
+    // 2. Check if doctor already exists
+    // LINE 21 (where the error occurs)
+    const emailExists = await Doctor.findOne({ email: req.body.email }); 
+    if (emailExists) return res.status(400).send({ message: 'Email already exists' });
+
+    // 3. Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(req.body.password, salt);
+
+    // 4. Create and save new doctor
+    const doctor = new Doctor({
+      name: req.body.name,
+      email: req.body.email,
+      password: hashedPassword,
+      specialization: req.body.specialization,
+      fees: req.body.fees,
+    });
+    
+    const savedDoctor = await doctor.save();
+    
+    // 5. Generate Token and respond
+    const token = generateToken(savedDoctor._id);
+    res.header('auth-token', token).send({
+      token,
+      doctor: { id: savedDoctor._id, name: savedDoctor.name, email: savedDoctor.email, specialization: savedDoctor.specialization },
+    });
+
+  } catch (err) {
+    // If the error persists after the fix, it will be caught here. 
+    // Console log the full error for detailed inspection.
+    console.error("Registration error:", err); 
+    res.status(500).send({ message: 'Server error during registration.' });
   }
-  const doctors = await User.find(query).select('-password').sort({'doctorDetails.rating':-1});
-  res.json(doctors);
-});
+};
 
-const getDoctorById = asyncHandler(async (req, res) => {
-  const doctor = await User.findOne({ _id: req.params.id, role: 'doctor' }).select('-password');
-  if (!doctor) { res.status(404); throw new Error('Doctor not found'); }
-  res.json(doctor);
-});
+// POST /doctor/login
+exports.loginDoctor = async (req, res) => {
+  // 1. Validate input with Joi
+  const { error } = doctorLoginValidation.validate(req.body);
+  if (error) return res.status(400).send({ message: error.details[0].message });
 
-const searchDoctors = asyncHandler(async (req, res) => {
-  const { q, limit = 10 } = req.query;
-  if (!q) { res.status(400); throw new Error('Query required'); }
-  const doctors = await User.find({ role:'doctor', isActive:true, $or:[ {name:new RegExp(q,'i')}, {'doctorDetails.specialization':new RegExp(q,'i')}, {'doctorDetails.city':new RegExp(q,'i')} ] }).select('-password').limit(Number(limit));
-  res.json(doctors);
-});
+  try {
+    // 2. Check if email exists
+    const doctor = await Doctor.findOne({ email: req.body.email });
+    if (!doctor) return res.status(400).send({ message: 'Invalid Credentials.' });
 
-const getDoctorAppointments = asyncHandler(async (req, res) => {
-  const { status, date } = req.query;
-  let query = { doctorId: req.user._id };
-  if (status) query.status = status;
-  if (date) {
-    const startDate = new Date(date);
-    const endDate = new Date(date); endDate.setDate(endDate.getDate()+1);
-    query.appointmentDate = { $gte: startDate, $lt: endDate };
+    // 3. Check password
+    const validPass = await bcrypt.compare(req.body.password, doctor.password);
+    if (!validPass) return res.status(400).send({ message: 'Invalid Credentials.' });
+
+    // 4. Generate Token and respond
+    const token = generateToken(doctor._id);
+    res.header('auth-token', token).send({
+      token,
+      doctor: { id: doctor._id, name: doctor.name, email: doctor.email, specialization: doctor.specialization, status: doctor.status },
+    });
+  } catch (err) {
+    console.error("Login error:", err);
+    res.status(500).send({ message: 'Server error during login.' });
   }
-  const appointments = await Appointment.find(query).populate('patientId','name email phone patientDetails').sort({ appointmentDate: 1 });
-  res.json(appointments);
-});
+};
 
-const updateAvailability = asyncHandler(async (req, res) => {
-  const { availability } = req.body;
-  const doctor = await User.findById(req.user._id);
-  if (!doctor || doctor.role !== 'doctor') { res.status(404); throw new Error('Doctor not found'); }
-  doctor.doctorDetails.availability = availability;
-  await doctor.save();
-  res.json({ message: 'Availability updated', availability: doctor.doctorDetails.availability });
-});
+// PUT /doctor/status
+exports.updateStatus = async (req, res) => {
+  try {
+    const { status } = req.body;
+    const doctorId = req.user.id; // From auth middleware
 
-const getDoctorStats = asyncHandler(async (req, res) => {
-  const doctorId = req.user._id;
-  const totalAppointments = await Appointment.countDocuments({ doctorId });
-  const completedAppointments = await Appointment.countDocuments({ doctorId, status:'completed' });
-  const todayAppointments = await Appointment.countDocuments({ doctorId, appointmentDate: { $gte: new Date().setHours(0,0,0,0), $lt: new Date().setHours(23,59,59,999) } });
-  const revenue = await Appointment.aggregate([{ $match: { doctorId, paymentStatus: 'paid' } }, { $group: { _id:null, total: { $sum: '$consultationFee' } } }]);
-  res.json({ totalAppointments, completedAppointments, todayAppointments, totalRevenue: revenue[0]?.total || 0 });
-});
+    // Validate status
+    const validStatuses = ['online', 'offline', 'free', 'busy'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).send({ message: 'Invalid status. Must be one of: online, offline, free, busy' });
+    }
 
-module.exports = { getAllDoctors, getDoctorById, searchDoctors, getDoctorAppointments, updateAvailability, getDoctorStats };
+    // Update doctor status
+    const updatedDoctor = await Doctor.findByIdAndUpdate(
+      doctorId,
+      { status: status },
+      { new: true, select: 'name email specialization fees status' }
+    );
+
+    if (!updatedDoctor) {
+      return res.status(404).send({ message: 'Doctor not found' });
+    }
+
+    res.send({ 
+      message: 'Status updated successfully',
+      status: updatedDoctor.status,
+      doctor: updatedDoctor
+    });
+
+  } catch (err) {
+    console.error("Status update error:", err);
+    res.status(500).send({ message: 'Server error during status update.' });
+  }
+};
+
+// Note: Ensure your Doctor.js file looks like this:
+// // backend/models/Doctor.js
+// const mongoose = require('mongoose');
+// // ... Schema definition ...
+// module.exports = mongoose.model('Doctor', DoctorSchema);

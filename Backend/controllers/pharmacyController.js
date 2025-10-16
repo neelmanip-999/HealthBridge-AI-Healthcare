@@ -1,39 +1,128 @@
-const User = require('../models/User');
-const Order = require('../models/Order');
-const asyncHandler = require('express-async-handler');
+// HealthBridge/backend/controllers/pharmacyController.js
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const Pharmacy = require('../models/Pharmacy');
+const PharmacyUser = require('../models/PharmacyUser');
+const { pharmacyAddValidation } = require('../validations/pharmacyValidation');
 
-const getNearbyPharmacies = asyncHandler(async (req, res) => {
-  const { lat, lng, maxDistance = 5000 } = req.query;
-  if (!lat || !lng) { res.status(400); throw new Error('lat/lng required'); }
-  const pharmacies = await User.find({ role:'pharmacy', isActive:true, 'pharmacyDetails.location': { $near: { $geometry: { type:'Point', coordinates: [parseFloat(lng), parseFloat(lat)] }, $maxDistance: parseInt(maxDistance) } } }).select('-password');
-  res.json(pharmacies);
-});
+// Shared function to generate JWT
+const generateToken = (id) => {
+  return jwt.sign({ id, role: 'pharmacy' }, process.env.JWT_SECRET, {
+    expiresIn: '1d', // Token expires in 1 day
+  });
+};
 
-const getAllPharmacies = asyncHandler(async (req, res) => {
-  const { city, deliveryAvailable } = req.query;
-  let query = { role:'pharmacy', isActive:true };
-  if (city) query['pharmacyDetails.city'] = new RegExp(city,'i');
-  if (deliveryAvailable !== undefined) query['pharmacyDetails.deliveryAvailable'] = deliveryAvailable === 'true';
-  const pharmacies = await User.find(query).select('-password');
-  res.json(pharmacies);
-});
+// POST /pharmacy/register
+exports.registerPharmacy = async (req, res) => {
+  try {
+    const { name, email, password, address, phone } = req.body;
 
-const getPharmacyOrders = asyncHandler(async (req, res) => {
-  const { status } = req.query;
-  let query = { pharmacyId: req.user._id };
-  if (status) query.status = status;
-  const orders = await Order.find(query).populate('patientId','name email phone patientDetails').populate('appointmentId','prescription').sort({ createdAt: -1 });
-  res.json(orders);
-});
+    // Check if pharmacy already exists
+    const emailExists = await PharmacyUser.findOne({ email });
+    if (emailExists) return res.status(400).send({ message: 'Email already exists' });
 
-const updateOrderStatus = asyncHandler(async (req, res) => {
-  const { status } = req.body;
-  const order = await Order.findById(req.params.id);
-  if (!order) { res.status(404); throw new Error('Order not found'); }
-  if (order.pharmacyId.toString() !== req.user._id.toString()) { res.status(403); throw new Error('Not authorized'); }
-  order.status = status;
-  await order.save();
-  res.json({ message: 'Order updated', order });
-});
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
 
-module.exports = { getNearbyPharmacies, getAllPharmacies, getPharmacyOrders, updateOrderStatus };
+    // Create new pharmacy user
+    const pharmacy = new PharmacyUser({
+      name,
+      email,
+      password: hashedPassword,
+      address,
+      phone,
+    });
+    
+    const savedPharmacy = await pharmacy.save();
+    
+    // Generate Token and respond
+    const token = generateToken(savedPharmacy._id);
+    res.header('auth-token', token).send({
+      token,
+      pharmacy: { id: savedPharmacy._id, name: savedPharmacy.name, email: savedPharmacy.email, address: savedPharmacy.address },
+    });
+
+  } catch (err) {
+    console.error("Pharmacy Registration error:", err);
+    res.status(500).send({ message: 'Server error during registration.' });
+  }
+};
+
+// POST /pharmacy/login
+exports.loginPharmacy = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // Check if email exists
+    const pharmacy = await PharmacyUser.findOne({ email });
+    if (!pharmacy) return res.status(400).send({ message: 'Invalid Credentials.' });
+
+    // Check password
+    const validPass = await bcrypt.compare(password, pharmacy.password);
+    if (!validPass) return res.status(400).send({ message: 'Invalid Credentials.' });
+
+    // Generate Token and respond
+    const token = generateToken(pharmacy._id);
+    res.header('auth-token', token).send({
+      token,
+      pharmacy: { id: pharmacy._id, name: pharmacy.name, email: pharmacy.email, address: pharmacy.address },
+    });
+  } catch (err) {
+    console.error("Pharmacy Login error:", err);
+    res.status(500).send({ message: 'Server error during login.' });
+  }
+};
+
+// POST /pharmacy/add
+exports.addMedicine = async (req, res) => {
+    const { error } = pharmacyAddValidation.validate(req.body);
+    if (error) return res.status(400).send({ message: error.details[0].message });
+
+    try {
+        const newMedicine = new Pharmacy(req.body);
+        await newMedicine.save();
+        res.status(201).send({ message: 'Medicine added successfully', medicine: newMedicine });
+    } catch (err) {
+        res.status(500).send({ message: 'Server error adding medicine.', error: err.message });
+    }
+};
+
+// GET /pharmacy/list
+exports.listMedicines = async (req, res) => {
+    try {
+        const medicines = await Pharmacy.find({});
+        res.send(medicines);
+    } catch (err) {
+        res.status(500).send({ message: 'Server error listing medicines.' });
+    }
+};
+
+// PUT /pharmacy/update/:id
+exports.updateMedicine = async (req, res) => {
+    const { error } = pharmacyAddValidation.validate(req.body); // Reuse validation
+    if (error) return res.status(400).send({ message: error.details[0].message });
+
+    try {
+        const updatedMed = await Pharmacy.findByIdAndUpdate(
+            req.params.id, 
+            req.body, 
+            { new: true, runValidators: true }
+        );
+        if (!updatedMed) return res.status(404).send({ message: 'Medicine not found.' });
+        res.send({ message: 'Medicine updated successfully', medicine: updatedMed });
+    } catch (err) {
+        res.status(500).send({ message: 'Server error updating medicine.' });
+    }
+};
+
+// DELETE /pharmacy/delete/:id
+exports.deleteMedicine = async (req, res) => {
+    try {
+        const deletedMed = await Pharmacy.findByIdAndDelete(req.params.id);
+        if (!deletedMed) return res.status(404).send({ message: 'Medicine not found.' });
+        res.send({ message: 'Medicine deleted successfully' });
+    } catch (err) {
+        res.status(500).send({ message: 'Server error deleting medicine.' });
+    }
+};

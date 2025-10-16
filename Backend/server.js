@@ -1,74 +1,105 @@
 const express = require('express');
 const http = require('http');
-const socketio = require('socket.io');
+const { Server } = require('socket.io');
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const cors = require('cors');
+const Chat = require('./models/Chat');
 
 dotenv.config();
 
-// --- 1. App Setup ---
 const app = express();
 const server = http.createServer(app);
-const io = socketio(server, {
-  cors: {
-    origin: "http://localhost:5173", // Replace with your React app's URL
-    methods: ["GET", "POST", "PUT"],
-  }
+const io = new Server(server, {
+    cors: {
+        origin: "http://localhost:5173", // Your React app's URL
+        methods: ["GET", "POST", "PUT"],
+    }
 });
 const PORT = process.env.PORT || 5000;
 
-// Middleware
 app.use(cors());
-app.use(express.json()); // Body parser
+app.use(express.json());
 
-// --- 2. Database Connection ---
 mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log('MongoDB Connected...'))
-  .catch(err => console.log('MongoDB Connection Error:', err));
+    .then(() => console.log('MongoDB Connected...'))
+    .catch(err => console.log('MongoDB Connection Error:', err));
 
-// --- 3. Routes ---
 const doctorRoutes = require('./routes/doctor');
 const patientRoutes = require('./routes/patient');
-const pharmacyRoutes = require('./routes/pharmacy');
-const aiAssistantRoutes = require('./routes/aiAssistant');
-const mapsRoutes = require('./routes/maps');
+const chatRoutes = require('./routes/chat');
 
 app.use('/api/doctor', doctorRoutes);
 app.use('/api/patient', patientRoutes);
-app.use('/api/pharmacy', pharmacyRoutes);
-app.use('/api/ai-assistant', aiAssistantRoutes);
-app.use('/api/maps', mapsRoutes);
+app.use('/api/chat', chatRoutes);
 
-// --- 4. Socket.io Logic ---
+const userSocketMap = {}; // { userId: socketId }
+
 io.on('connection', (socket) => {
-  console.log(`User connected: ${socket.id}`);
+    const userId = socket.handshake.auth.userId;
+    if (userId) {
+        userSocketMap[userId] = socket.id;
+        console.log(`User connected: ${userId} with socket ID: ${socket.id}`);
+    }
 
-  // Example: Handle doctor going online/offline
-  socket.on('goOnline', (doctorId) => {
-    // 1. Update DB (Doctor.findByIdAndUpdate({ status: 'online' }))
-    // 2. Map doctorId to socket.id (for direct messaging)
-    socket.join(doctorId); // Join a room specific to the doctor
-    console.log(`Doctor ${doctorId} is now online.`);
-    
-    // Broadcast status change to all patients/clients
-    io.emit('doctorStatusUpdate', { id: doctorId, status: 'online' });
-  });
+    socket.on('disconnect', () => {
+        const disconnectedUserId = Object.keys(userSocketMap).find(key => userSocketMap[key] === socket.id);
+        if (disconnectedUserId) {
+            delete userSocketMap[disconnectedUserId];
+            console.log(`User disconnected: ${disconnectedUserId}`);
+        }
+    });
 
-  socket.on('disconnect', () => {
-    console.log(`User disconnected: ${socket.id}`);
-    // Handle doctor going offline logic here
-  });
+    // --- THIS IS THE NEW LISTENER THAT NOTIFIES THE DOCTOR ---
+    socket.on('startConsultation', (data) => {
+        // data: { doctorId, patient: { _id, name } }
+        const doctorSocketId = userSocketMap[data.doctorId];
 
-  // --- Chat Logic ---
-  socket.on('sendMessage', (data) => {
-    // data: { senderId, receiverId, message, timestamp }
-    // 1. Save message to Chat MongoDB collection
-    // 2. Send message to the specific receiver
-    io.to(data.receiverId).emit('receiveMessage', data);
-    console.log(`Message from ${data.senderId} to ${data.receiverId}: ${data.message}`);
-  });
+        if (doctorSocketId) {
+            console.log(`Notifying Doctor ${data.doctorId} of new chat from Patient ${data.patient._id}`);
+            
+            // This event is what DoctorDashboard.jsx is waiting for.
+            io.to(doctorSocketId).emit('consultationStarted', {
+                partner: data.patient, // The patient is the doctor's chat partner
+                sessionId: `${data.patient._id}-${data.doctorId}` // A unique ID for this chat session
+            });
+        } else {
+            console.log(`Doctor ${data.doctorId} is not online. Cannot start consultation.`);
+            // Optional: You could emit an event back to the patient here.
+            // socket.emit('doctorOffline', { message: 'The doctor is currently offline.' });
+        }
+    });
+
+    socket.on('sendMessage', async (data) => {
+        try {
+            const newMessage = new Chat({
+                senderId: data.senderId,
+                receiverId: data.receiverId,
+                senderRole: data.senderRole,
+                message: data.message,
+            });
+
+            const savedMessage = await newMessage.save();
+            console.log('Message saved to DB:', savedMessage);
+
+            const receiverSocketId = userSocketMap[data.receiverId];
+            if (receiverSocketId) {
+                io.to(receiverSocketId).emit('receiveMessage', savedMessage);
+            }
+            socket.emit('receiveMessage', savedMessage);
+        } catch (error) {
+            console.error('Error handling message:', error);
+            socket.emit('messageError', { message: 'Failed to send message.' });
+        }
+    });
+
+    socket.on('endConsultation', (data) => {
+        const partnerSocketId = userSocketMap[data.partnerId];
+        if (partnerSocketId) {
+            io.to(partnerSocketId).emit('consultationEnded', { sessionId: data.sessionId });
+        }
+    });
 });
 
-// --- 5. Start Server ---
 server.listen(PORT, () => console.log(`Server started on port ${PORT}`));
+

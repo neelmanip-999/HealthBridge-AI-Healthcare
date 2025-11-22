@@ -1,33 +1,33 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MessageSquare, Send, X } from 'lucide-react';
-import io from 'socket.io-client';
-import api from '../services/api'; // Ensure this path is correct
-
-const SOCKET_SERVER_URL = "http://localhost:5000";
+import api from '../services/api';
+import { useSocket } from '../context/SocketContext';
 
 const ChatWindow = ({ partner, onEndChat, userRole }) => {
+    const { socket, isConnected } = useSocket();
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
-    const [isConnected, setIsConnected] = useState(false);
     const messagesEndRef = useRef(null);
-    const socket = useRef(null);
 
     const currentUser = JSON.parse(localStorage.getItem('user'));
-    // Make sure currentUser from localStorage has an 'id' property
-    const currentUserId = currentUser?.id; 
+    
+    // --- FIX 1: ROBUST ID CHECK ---
+    // Handles both mongo '_id' and normalized 'id'
+    const currentUserId = currentUser?._id || currentUser?.id; 
+    
     const isDoctor = userRole === 'doctor';
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     };
 
-    // Effect for fetching initial chat history
+    // 1. Fetch History
     useEffect(() => {
-        // --- FIX: Use partner._id to fetch history ---
         if (!currentUserId || !partner?._id) return;
 
         const fetchHistory = async () => {
             try {
+                // Ensure we aren't sending "undefined" in the URL
                 const response = await api.get(`/chat/history/${currentUserId}/${partner._id}`);
                 setMessages(response.data);
             } catch (error) {
@@ -37,50 +37,43 @@ const ChatWindow = ({ partner, onEndChat, userRole }) => {
         fetchHistory();
     }, [currentUserId, partner._id]);
 
-    // Effect for managing socket connection
+    // 2. Listen for Incoming Messages
     useEffect(() => {
-        if (!currentUserId) return;
+        if (!socket) return;
 
-        socket.current = io(SOCKET_SERVER_URL, {
-            autoConnect: false,
-            transports: ['websocket'],
-            auth: { userId: currentUserId }
-        });
-
-        socket.current.connect();
-        socket.current.on('connect', () => setIsConnected(true));
-        socket.current.on('receiveMessage', (message) => {
+        const handleReceiveMessage = (message) => {
+            // FIX: We rely purely on the server to send the message back.
+            // This avoids the "duplicate message" bug caused by optimistic updates.
             setMessages((prev) => [...prev, message]);
-        });
-        socket.current.on('consultationEnded', () => {
-            window.alert(`${partner.name} has ended the consultation.`);
-            onEndChat();
-        });
+        };
+
+        socket.on('receiveMessage', handleReceiveMessage);
 
         return () => {
-            if (socket.current) {
-                socket.current.disconnect();
-                setIsConnected(false);
-            }
+            socket.off('receiveMessage', handleReceiveMessage);
         };
-    }, [currentUserId, partner.name, onEndChat]);
+    }, [socket]);
 
+    // Scroll on new message
     useEffect(scrollToBottom, [messages]);
 
-    const sendMessage = (e) => {
+    const sendMessage = async (e) => {
         e.preventDefault();
-        if (input.trim() === '' || !socket.current || !isConnected) return;
+        if (input.trim() === '' || !socket || !isConnected || !currentUserId) return;
 
         const messageData = {
             senderId: currentUserId,
-            // --- THE FIX IS HERE ---
-            // Use partner._id which comes from the MongoDB document
             receiverId: partner._id,
             senderRole: userRole,
             message: input.trim(),
+            timestamp: new Date().toISOString() // Add timestamp for local display
         };
 
-        socket.current.emit('sendMessage', messageData);
+        // --- FIX 2: REMOVED OPTIMISTIC UPDATE ---
+        // Previously, we added the message locally AND waited for the server.
+        // This caused duplicates. Now we just emit and wait for the echo.
+        
+        socket.emit('sendMessage', messageData);
         setInput('');
     };
 
@@ -90,9 +83,8 @@ const ChatWindow = ({ partner, onEndChat, userRole }) => {
             if (isDoctor) {
                 await api.put('/doctor/status', { status: 'free' });
             }
-            if (socket.current) {
-                // --- FIX: Use partner._id to end consultation ---
-                socket.current.emit('endConsultation', { partnerId: partner._id });
+            if (socket) {
+                socket.emit('endConsultation', { partnerId: partner._id });
             }
             onEndChat();
         } catch (err) {
@@ -102,46 +94,79 @@ const ChatWindow = ({ partner, onEndChat, userRole }) => {
     };
 
     const formatTime = (timestamp) => {
+        if (!timestamp) return '';
         return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     };
 
-    // --- JSX (Unchanged) ---
     return (
-        <div className="flex flex-col h-full bg-white rounded-3xl shadow-xl">
-            <div className="p-4 border-b flex justify-between items-center">
-                <h3 className="text-xl font-bold text-indigo-700">Chat with {partner.name}</h3>
+        <div className="flex flex-col h-full bg-white rounded-3xl shadow-xl border border-gray-200 overflow-hidden">
+            {/* Header */}
+            <div className="p-4 bg-gradient-to-r from-gray-50 to-white border-b flex justify-between items-center">
                 <div className="flex items-center space-x-3">
-                    <span className={`px-2 py-1 text-xs rounded-full ${isConnected ? 'bg-green-500 text-white' : 'bg-gray-300'}`}>
-                        {isConnected ? 'Live' : 'Connecting...'}
-                    </span>
-                    <button onClick={handleEndChat} className="p-2 bg-red-500 text-white rounded-full hover:bg-red-600">
-                        <X className="w-5 h-5" />
-                    </button>
-                </div>
-            </div>
-            <div className="flex-grow p-4 overflow-y-auto space-y-4">
-                {messages.map((msg) => (
-                    <div key={msg._id} className={`flex ${msg.senderId === currentUserId ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-md p-3 rounded-xl shadow-md ${msg.senderId === currentUserId ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-gray-200 rounded-tl-none'}`}>
-                            <p>{msg.message}</p>
-                            <span className={`text-xs mt-1 block ${msg.senderId === currentUserId ? 'text-indigo-200' : 'text-gray-500'}`}>
-                                {formatTime(msg.timestamp)}
-                            </span>
-                        </div>
+                    <div className="relative">
+                        <img 
+                            src={partner.image || "https://cdn-icons-png.flaticon.com/512/377/377429.png"} 
+                            alt={partner.name}
+                            className="w-10 h-10 rounded-full border border-gray-200 object-cover" 
+                        />
+                        <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${isConnected ? 'bg-green-500' : 'bg-gray-400'}`}></span>
                     </div>
-                ))}
+                    <div>
+                        <h3 className="text-lg font-bold text-gray-800">{partner.name}</h3>
+                        <span className="text-xs text-gray-500 flex items-center">
+                            {isConnected ? 'Online' : 'Connecting...'}
+                        </span>
+                    </div>
+                </div>
+                <button onClick={handleEndChat} className="p-2 bg-red-50 text-red-500 rounded-full hover:bg-red-100 transition">
+                    <X className="w-5 h-5" />
+                </button>
+            </div>
+
+            {/* Messages Area */}
+            <div className="flex-grow p-4 overflow-y-auto space-y-4 bg-gray-50/50">
+                {messages.length === 0 && (
+                    <div className="text-center text-gray-400 mt-10">
+                        <MessageSquare className="w-10 h-10 mx-auto mb-2 opacity-20" />
+                        <p className="text-sm">No messages yet. Start the conversation!</p>
+                    </div>
+                )}
+                
+                {messages.map((msg, index) => {
+                    const isMe = msg.senderId === currentUserId;
+                    return (
+                        <div key={index} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                            <div className={`max-w-[75%] p-3 rounded-2xl shadow-sm relative ${
+                                isMe 
+                                ? 'bg-indigo-600 text-white rounded-br-none' 
+                                : 'bg-white text-gray-800 border border-gray-100 rounded-bl-none'
+                            }`}>
+                                <p className="text-sm leading-relaxed">{msg.message}</p>
+                                <span className={`text-[10px] mt-1 block text-right ${isMe ? 'text-indigo-200' : 'text-gray-400'}`}>
+                                    {formatTime(msg.timestamp)}
+                                </span>
+                            </div>
+                        </div>
+                    );
+                })}
                 <div ref={messagesEndRef} />
             </div>
-            <form onSubmit={sendMessage} className="p-4 border-t flex space-x-3">
+
+            {/* Input Area */}
+            <form onSubmit={sendMessage} className="p-4 bg-white border-t flex space-x-3">
                 <input
                     type="text"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     placeholder="Type your message..."
-                    className="flex-grow px-4 py-3 border rounded-xl"
+                    className="flex-grow px-4 py-3 bg-gray-50 border-transparent focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 rounded-xl transition-all outline-none"
                     disabled={!isConnected}
                 />
-                <button type="submit" className="bg-indigo-600 text-white py-3 px-5 rounded-xl disabled:opacity-50" disabled={!isConnected || input.trim() === ''}>
+                <button 
+                    type="submit" 
+                    className="bg-indigo-600 text-white p-3 rounded-xl hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-transform transform active:scale-95 shadow-lg shadow-indigo-200" 
+                    disabled={!isConnected || input.trim() === ''}
+                >
                     <Send className="w-5 h-5" />
                 </button>
             </form>

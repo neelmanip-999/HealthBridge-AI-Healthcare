@@ -1,18 +1,66 @@
-// HealthBridge/frontend/src/pages/PatientDashboard.jsx
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-// FIX: Changed 'Pills' to the correct icon name, 'Pill'
-import { HeartPulse, Stethoscope, Pill, Brain } from "lucide-react"; 
+import { 
+    HeartPulse, 
+    Stethoscope, 
+    Pill, 
+    Brain,
+    Calendar,
+    Clock,
+    Video,
+    Trash2,
+    LogOut
+} from "lucide-react"; 
+import { getPatientAppointments, cancelAppointment } from '../services/api';
 
 const PatientDashboard = () => {
     const navigate = useNavigate();
-    // Assuming patient data is stored in localStorage after login
     const patient = JSON.parse(localStorage.getItem('user'));
+    
+    const [appointments, setAppointments] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        fetchAppointments();
+    }, []);
+
+    const fetchAppointments = async () => {
+        try {
+            const res = await getPatientAppointments();
+            setAppointments(res.data);
+        } catch (err) {
+            console.error("Failed to fetch appointments", err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleCancel = async (id) => {
+        if (window.confirm("Are you sure you want to cancel this appointment?")) {
+            try {
+                await cancelAppointment(id);
+                setAppointments(appointments.filter(apt => apt._id !== id));
+            } catch (err) {
+                alert("Failed to cancel appointment.");
+            }
+        }
+    };
+
+    const handleJoinChat = (appointment) => {
+        navigate(`/patient/chat/${appointment.doctorId._id}`, { 
+            state: { doctorData: appointment.doctorId } 
+        });
+    };
 
     const handleLogout = () => {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         navigate('/');
+    };
+
+    const formatDate = (dateString) => {
+        const options = { year: 'numeric', month: 'long', day: 'numeric' };
+        return new Date(dateString).toLocaleDateString(undefined, options);
     };
 
     const DashboardCard = ({ title, icon: Icon, colorClass, link, description }) => {
@@ -43,10 +91,6 @@ const PatientDashboard = () => {
                         </svg>
                     </div>
                 </div>
-                
-                {/* Decorative elements */}
-                <div className={`absolute top-4 right-4 w-20 h-20 bg-${color}-200/20 rounded-full -z-10 group-hover:scale-150 transition-transform duration-700`}></div>
-                <div className={`absolute bottom-4 left-4 w-12 h-12 bg-${color}-300/20 rounded-full -z-10 group-hover:scale-125 transition-transform duration-500`}></div>
             </div>
         );
     };
@@ -75,16 +119,9 @@ const PatientDashboard = () => {
                         <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
                         <span className="text-gray-600 font-medium">Hello, {patient?.name || 'Patient'}!</span>
                     </div>
-                    <button 
-                        onClick={handleLogout}
-                        className="btn-danger btn-ripple"
-                    >
-                        <span className="flex items-center">
-                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                            </svg>
-                            Logout
-                        </span>
+                    <button onClick={handleLogout} className="btn-danger btn-ripple flex items-center px-4 py-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition">
+                        <LogOut className="w-4 h-4 mr-2" />
+                        Logout
                     </button>
                 </div>
             </header>
@@ -92,40 +129,17 @@ const PatientDashboard = () => {
             <main className="max-w-7xl mx-auto relative z-10">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
                     <div style={{ animationDelay: '0.1s' }}>
-                        <DashboardCard
-                            title="Find a Doctor"
-                            description="View specialists, their status, and availability."
-                            icon={Stethoscope}
-                            colorClass="border-indigo-500"
-                            link="/patient/doctors"
-                        />
+                        {/* FIX: Link is now /patient/doctors to match App.jsx */}
+                        <DashboardCard title="Find a Doctor" description="View specialists, their status, and availability." icon={Stethoscope} colorClass="border-indigo-500" link="/patient/doctors" />
                     </div>
                     <div style={{ animationDelay: '0.2s' }}>
-                        <DashboardCard
-                            title="Medical History"
-                            description="Review and update your past records."
-                            icon={HeartPulse}
-                            colorClass="border-red-500"
-                            link="/patient/history"
-                        />
+                        <DashboardCard title="Medical History" description="Review and update your past records." icon={HeartPulse} colorClass="border-red-500" link="/patient/history" />
                     </div>
                     <div style={{ animationDelay: '0.3s' }}>
-                        <DashboardCard
-                            title="Pharmacy Catalog"
-                            description="Browse available medicines and prices."
-                            icon={Pill}
-                            colorClass="border-yellow-500"
-                            link="/patient/pharmacy"
-                        />
+                        <DashboardCard title="Pharmacy Catalog" description="Browse available medicines and prices." icon={Pill} colorClass="border-yellow-500" link="/patient/pharmacy" />
                     </div>
                     <div style={{ animationDelay: '0.4s' }}>
-                        <DashboardCard
-                            title="AI Health Assistant"
-                            description="Get instant health answers and find nearby facilities."
-                            icon={Brain}
-                            colorClass="border-purple-500"
-                            link="/patient/ai-assistant"
-                        />
+                        <DashboardCard title="AI Health Assistant" description="Get instant health answers and find nearby facilities." icon={Brain} colorClass="border-purple-500" link="/patient/ai-assistant" />
                     </div>
                 </div>
 
@@ -137,23 +151,72 @@ const PatientDashboard = () => {
                         <h2 className="text-3xl font-bold text-gray-800">Your Consultations</h2>
                     </div>
                     
-                    <div className="bg-gradient-to-br from-indigo-50 to-blue-50 p-8 rounded-2xl border-2 border-dashed border-indigo-200 text-center">
-                        <div className="inline-flex items-center justify-center w-20 h-20 bg-indigo-100 rounded-full mb-6 animate-bounce">
-                            <Stethoscope className="h-10 w-10 text-indigo-600" />
-                        </div>
-                        <h3 className="text-xl font-semibold text-gray-700 mb-3">Live Consultations</h3>
-                        <p className="text-gray-500 mb-6 max-w-md mx-auto">
-                            Real-time consultation list and chat history will appear here. Connect with doctors instantly for your health needs.
-                        </p>
-                        <div className="bg-white/60 backdrop-blur-sm p-4 rounded-xl border border-indigo-200 inline-block">
-                            <p className="text-indigo-600 font-medium flex items-center">
-                                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                Click "Find a Doctor" to start a new session
+                    {loading ? (
+                        <div className="text-center py-10 text-gray-500">Loading appointments...</div>
+                    ) : appointments.length === 0 ? (
+                        <div className="bg-gradient-to-br from-indigo-50 to-blue-50 p-8 rounded-2xl border-2 border-dashed border-indigo-200 text-center">
+                            <div className="inline-flex items-center justify-center w-20 h-20 bg-indigo-100 rounded-full mb-6">
+                                <Stethoscope className="h-10 w-10 text-indigo-600" />
+                            </div>
+                            <h3 className="text-xl font-semibold text-gray-700 mb-3">No Active Consultations</h3>
+                            <p className="text-gray-500 mb-6 max-w-md mx-auto">
+                                Start a new consultation by finding a doctor and booking an appointment.
                             </p>
+                            {/* FIX: Button link updated here as well */}
+                            <button 
+                                onClick={() => navigate('/patient/doctors')}
+                                className="bg-indigo-600 text-white px-6 py-2 rounded-xl hover:bg-indigo-700 transition"
+                            >
+                                Find a Doctor
+                            </button>
                         </div>
-                    </div>
+                    ) : (
+                        <div className="space-y-4">
+                            {appointments.map((apt) => (
+                                <div key={apt._id} className="bg-white border border-gray-200 rounded-2xl p-6 hover:shadow-lg transition-all flex flex-col md:flex-row justify-between items-center gap-4">
+                                    <div className="flex items-center gap-4 w-full md:w-auto">
+                                        <img 
+                                            src={apt.doctorId.image || "https://cdn-icons-png.flaticon.com/512/377/377429.png"} 
+                                            alt="Doctor" 
+                                            className="w-16 h-16 rounded-full border-2 border-indigo-100 object-cover"
+                                        />
+                                        <div>
+                                            <h3 className="text-xl font-bold text-gray-900">Dr. {apt.doctorId.name}</h3>
+                                            <p className="text-indigo-600 font-medium">{apt.doctorId.specialization}</p>
+                                            <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
+                                                <span className="flex items-center gap-1"><Calendar className="h-4 w-4"/> {formatDate(apt.date)}</span>
+                                                <span className="flex items-center gap-1"><Clock className="h-4 w-4"/> {apt.timeSlot}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-3 w-full md:w-auto justify-end">
+                                        <span className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider ${
+                                            apt.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                                        }`}>
+                                            {apt.paymentStatus}
+                                        </span>
+
+                                        <button 
+                                            onClick={() => handleJoinChat(apt)}
+                                            className="flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white px-6 py-3 rounded-xl font-bold shadow-md hover:shadow-xl transition transform hover:-translate-y-1"
+                                        >
+                                            <Video className="h-5 w-5" />
+                                            Join
+                                        </button>
+
+                                        <button 
+                                            onClick={() => handleCancel(apt._id)}
+                                            className="p-3 text-red-500 hover:bg-red-50 rounded-xl transition border border-transparent hover:border-red-100"
+                                            title="Cancel Appointment"
+                                        >
+                                            <Trash2 className="h-5 w-5" />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </main>
         </div>

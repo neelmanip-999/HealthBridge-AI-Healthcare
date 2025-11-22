@@ -1,25 +1,38 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom'; // Added useLocation
 import api from '../services/api';
 import ChatWindow from '../components/ChatWindow';
-import io from 'socket.io-client';
+import { useSocket } from '../context/SocketContext';
 
-const SOCKET_SERVER_URL = "http://localhost:5000";
+const LoadingSpinner = () => (
+    <div className="flex items-center justify-center h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-green-500"></div>
+    </div>
+);
 
 const Chat = () => {
-    const { doctorId } = useParams();
+    // NOTE: Ensure your Route in App.jsx is something like path="/patient/chat/:id"
+    // If your route param is named ':id', change this to: const { id: doctorId } = useParams();
+    const { doctorId } = useParams(); 
     const navigate = useNavigate();
-    const [doctor, setDoctor] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const location = useLocation(); // <-- Capture data passed from Dashboard
+    const { socket } = useSocket();
+
+    // 1. Initialize state with passed data (fast load) or null (need to fetch)
+    const [doctor, setDoctor] = useState(location.state?.doctorData || null);
+    const [loading, setLoading] = useState(!location.state?.doctorData);
     const [error, setError] = useState('');
-    const socket = useRef(null);
 
     const currentUser = JSON.parse(localStorage.getItem('user'));
 
-    // Effect to fetch the doctor's profile data
+    // 2. Fetch Doctor Profile (Only if we didn't get it from navigation state)
     useEffect(() => {
+        if (doctor) return; // Skip if we already have the data
+
         const fetchDoctorData = async () => {
             try {
+                setLoading(true);
+                // Fallback: Fetch by ID from URL
                 const response = await api.get(`/doctor/profile/${doctorId}`);
                 setDoctor(response.data);
             } catch (err) {
@@ -29,55 +42,38 @@ const Chat = () => {
                 setLoading(false);
             }
         };
-        fetchDoctorData();
-    }, [doctorId]);
 
-    // Effect to manage the socket connection and notify the server
+        if (doctorId) {
+            fetchDoctorData();
+        }
+    }, [doctorId, doctor]);
+
+    // 3. Notify Doctor (Socket Event)
     useEffect(() => {
-        // Wait until we have both the doctor's info and the current user's info
-        if (!doctor || !currentUser?.id) return;
-
-        // Initialize and connect the socket
-        socket.current = io(SOCKET_SERVER_URL, {
-            auth: { userId: currentUser.id },
-            transports: ['websocket']
-        });
-
-        // Once connected, emit the event to start the consultation
-        socket.current.on('connect', () => {
-            console.log("Patient socket connected. Emitting startConsultation.");
-            socket.current.emit('startConsultation', {
+        if (socket && doctor && currentUser?._id) {
+            console.log("Patient chat page is ready. Emitting startConsultation.");
+            socket.emit('startConsultation', {
                 doctorId: doctor._id,
                 patient: {
-                    _id: currentUser.id, // Ensure your localStorage user has 'id'
-                    name: currentUser.name // Ensure your localStorage user has 'name'
+                    _id: currentUser._id,
+                    name: currentUser.name
                 }
             });
-        });
-
-        // Cleanup: disconnect the socket when the component is unmounted
-        return () => {
-            if (socket.current) {
-                socket.current.disconnect();
-            }
-        };
-    }, [doctor, currentUser?.id]); // This effect re-runs if the doctor or user changes
-
+        }
+    }, [socket, doctor, currentUser?._id]);
 
     const handleEndChat = () => {
         navigate('/patient/dashboard');
     };
 
-    if (loading) {
-        return <div className="text-center p-10 font-bold">Loading Doctor Profile...</div>;
-    }
+    if (loading) return <LoadingSpinner />;
 
     if (error) {
         return (
             <div className="flex flex-col items-center justify-center h-screen bg-gray-100">
                 <h2 className="text-2xl font-bold text-red-600 mb-4">An Error Occurred</h2>
                 <p className="text-gray-600 mb-6">{error}</p>
-                <button onClick={() => navigate('/patient/doctors')} className="bg-blue-600 text-white px-6 py-2 rounded-lg">
+                <button onClick={() => navigate('/patient/find-doctors')} className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">
                     Find Another Doctor
                 </button>
             </div>
@@ -85,17 +81,20 @@ const Chat = () => {
     }
 
     return (
-        <div className="w-full h-screen p-4 bg-gray-100">
-            {doctor && (
+        <div className="w-full h-screen bg-gray-50">
+            {doctor ? (
                 <ChatWindow
-                    partner={doctor}
+                    partner={doctor} // Pass the full doctor object
                     onEndChat={handleEndChat}
                     userRole="patient"
                 />
+            ) : (
+                 <div className="flex items-center justify-center h-full">
+                    <p className="text-gray-500">Initializing secure chat environment...</p>
+                 </div>
             )}
         </div>
     );
 };
 
 export default Chat;
-

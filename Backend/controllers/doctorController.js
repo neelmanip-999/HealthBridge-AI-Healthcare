@@ -3,16 +3,18 @@ const jwt = require('jsonwebtoken');
 const Doctor = require('../models/Doctor'); 
 const { doctorRegisterValidation, doctorLoginValidation } = require('../validations/doctorValidation');
 
-// Shared function to generate JWT (Unchanged)
+// Shared function to generate JWT
 const generateToken = (id) => {
   return jwt.sign({ id, role: 'doctor' }, process.env.JWT_SECRET, {
     expiresIn: '1d',
   });
 };
 
-// POST /doctor/register (Unchanged)
+// POST /doctor/register
 exports.registerDoctor = async (req, res) => {
-  const { error } = doctorRegisterValidation.validate(req.body);
+  // Note: You might need to update your Joi validation schema in 'doctorValidation.js' 
+  // to allow these new fields (about, experience, etc.) or just validate the basics.
+  const { error } = doctorRegisterValidation.validate(req.body, { allowUnknown: true });
   if (error) return res.status(400).send({ message: error.details[0].message });
 
   try {
@@ -28,6 +30,11 @@ exports.registerDoctor = async (req, res) => {
       password: hashedPassword,
       specialization: req.body.specialization,
       fees: req.body.fees,
+      // NEW FIELDS added from Model update
+      experience: req.body.experience,
+      about: req.body.about,
+      image: req.body.image,
+      availableSlots: req.body.availableSlots || [] // Empty array if not provided
     });
     
     const savedDoctor = await doctor.save();
@@ -35,7 +42,12 @@ exports.registerDoctor = async (req, res) => {
     const token = generateToken(savedDoctor._id);
     res.header('auth-token', token).send({
       token,
-      doctor: { id: savedDoctor._id, name: savedDoctor.name, email: savedDoctor.email, specialization: savedDoctor.specialization },
+      doctor: { 
+        id: savedDoctor._id, 
+        name: savedDoctor.name, 
+        email: savedDoctor.email, 
+        specialization: savedDoctor.specialization 
+      },
     });
 
   } catch (err) {
@@ -44,7 +56,7 @@ exports.registerDoctor = async (req, res) => {
   }
 };
 
-// POST /doctor/login (Unchanged)
+// POST /doctor/login
 exports.loginDoctor = async (req, res) => {
   const { error } = doctorLoginValidation.validate(req.body);
   if (error) return res.status(400).send({ message: error.details[0].message });
@@ -59,7 +71,14 @@ exports.loginDoctor = async (req, res) => {
     const token = generateToken(doctor._id);
     res.header('auth-token', token).send({
       token,
-      doctor: { id: doctor._id, name: doctor.name, email: doctor.email, specialization: doctor.specialization, status: doctor.status },
+      doctor: { 
+        id: doctor._id, 
+        name: doctor.name, 
+        email: doctor.email, 
+        specialization: doctor.specialization, 
+        status: doctor.status,
+        image: doctor.image // sending image back on login is helpful
+      },
     });
   } catch (err) {
     console.error("Login error:", err);
@@ -67,7 +86,7 @@ exports.loginDoctor = async (req, res) => {
   }
 };
 
-// PUT /doctor/status (Unchanged)
+// PUT /doctor/status
 exports.updateStatus = async (req, res) => {
   try {
     const { status } = req.body;
@@ -101,11 +120,23 @@ exports.updateStatus = async (req, res) => {
 };
 
 
-// --- 1. ADD THIS FUNCTION TO GET ALL DOCTORS ---
-// Corresponds to the GET /all route
+// --- GET ALL DOCTORS WITH FILTERS ---
 exports.getAllDoctors = async (req, res) => {
     try {
-        const doctors = await Doctor.find().select('-password');
+        const { category, search } = req.query; // Capture query params
+        let query = {};
+
+        // 1. Filter by Category (Specialization)
+        if (category && category !== 'All' && category !== '') {
+            query.specialization = category;
+        }
+
+        // 2. Filter by Name Search (Optional logic if you add a search bar later)
+        if (search) {
+             query.name = { $regex: search, $options: 'i' }; // Case-insensitive search
+        }
+
+        const doctors = await Doctor.find(query).select('-password');
         res.json(doctors);
     } catch (err) {
         console.error(err.message);
@@ -113,8 +144,7 @@ exports.getAllDoctors = async (req, res) => {
     }
 };
 
-// --- 2. ADD THIS FUNCTION TO GET A SINGLE DOCTOR'S PROFILE ---
-// Corresponds to the GET /profile/:id route
+// --- GET SINGLE DOCTOR PROFILE ---
 exports.getDoctorProfileById = async (req, res) => {
     try {
         const doctor = await Doctor.findById(req.params.id).select('-password');
@@ -130,4 +160,3 @@ exports.getDoctorProfileById = async (req, res) => {
         res.status(500).send('Server Error');
     }
 };
-

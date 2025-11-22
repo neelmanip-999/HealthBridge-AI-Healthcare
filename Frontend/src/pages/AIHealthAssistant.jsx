@@ -1,11 +1,11 @@
-// HealthBridge/frontend/src/pages/AIHealthAssistant.jsx
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Brain, Send, MapPin, Hospital, Pill as PillIcon, ArrowLeft, Loader2 } from "lucide-react";
+import axios from 'axios'; // Using Axios for cleaner API calls
 
 const AIHealthAssistant = () => {
     const navigate = useNavigate();
-    const [query, setQuery] = useState("");
+    const [prompt, setPrompt] = useState(""); // Changed state name for clarity
     const [messages, setMessages] = useState([]);
     const [loading, setLoading] = useState(false);
     const [mapLoading, setMapLoading] = useState(false);
@@ -22,47 +22,43 @@ const AIHealthAssistant = () => {
     }, [messages]);
 
     const handleAIQuery = async () => {
-        if (!query.trim()) return;
+        if (!prompt.trim()) return;
 
-        const userMessage = { role: "user", content: query };
+        const userMessage = { role: "user", content: prompt };
         setMessages(prev => [...prev, userMessage]);
-        setQuery("");
+        setPrompt(""); // Clear input after sending
         setLoading(true);
 
         try {
-            const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
             const token = localStorage.getItem('token');
             
-            const response = await fetch(`${apiUrl}/api/ai-assistant/query`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'auth-token': token  // Changed from 'Authorization' to 'auth-token'
-                },
-                body: JSON.stringify({ query: userMessage.content })
-            });
-
-            const data = await response.json();
+            // Corrected API endpoint and request body
+            const response = await axios.post('/api/ai/ask', 
+                { prompt: userMessage.content }, // Sending 'prompt' to match backend
+                { headers: { 'auth-token': token } }
+            );
             
-            if (response.ok && data.success) {
-                setMessages(prev => [...prev, { role: "assistant", content: data.response }]);
+            if (response.data && response.data.success) {
+                setMessages(prev => [...prev, { role: "assistant", content: response.data.response }]);
             } else {
                 setMessages(prev => [...prev, { 
                     role: "assistant", 
-                    content: data.message || "I apologize, but I encountered an error processing your request. Please try again." 
+                    content: response.data.message || "I apologize, but I encountered an error. Please try again." 
                 }]);
             }
         } catch (error) {
-            console.error('Error:', error);
+            console.error('API Error:', error);
+            const errorMessage = error.response?.data?.message || "I'm having trouble connecting. Please check your connection and try again.";
             setMessages(prev => [...prev, { 
                 role: "assistant", 
-                content: "I'm having trouble connecting to the server right now. Please check your connection and try again." 
+                content: errorMessage
             }]);
         } finally {
             setLoading(false);
         }
     };
 
+    // --- Google Maps and other functions remain unchanged ---
     const findNearbyPlaces = async (type) => {
         setMapLoading(true);
         
@@ -84,7 +80,7 @@ const AIHealthAssistant = () => {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'auth-token': token  // Changed from 'Authorization' to 'auth-token'
+                            'auth-token': token
                         },
                         body: JSON.stringify({
                             latitude,
@@ -100,7 +96,6 @@ const AIHealthAssistant = () => {
                             initializeMap(latitude, longitude, data.places, type);
                         } else {
                             alert(data.message || 'No facilities found nearby. Try increasing the search radius.');
-                            // Still show map with user location
                             initializeMap(latitude, longitude, [], type);
                         }
                     } else {
@@ -138,7 +133,6 @@ const AIHealthAssistant = () => {
         }
 
         try {
-            // Create or update map
             if (!mapInstance.current) {
                 mapInstance.current = new window.google.maps.Map(mapRef.current, {
                     center: { lat, lng },
@@ -155,9 +149,6 @@ const AIHealthAssistant = () => {
                 mapInstance.current.setCenter({ lat, lng });
             }
 
-            // Clear existing markers (you may want to store markers in state to clear them)
-            
-            // Add user location marker
             new window.google.maps.Marker({
                 position: { lat, lng },
                 map: mapInstance.current,
@@ -173,7 +164,6 @@ const AIHealthAssistant = () => {
                 zIndex: 1000
             });
 
-            // Add markers for nearby places
             places.forEach((place, index) => {
                 const marker = new window.google.maps.Marker({
                     position: { lat: place.lat, lng: place.lng },
@@ -204,7 +194,6 @@ const AIHealthAssistant = () => {
                 });
             });
 
-            // Adjust bounds to show all markers
             if (places.length > 0) {
                 const bounds = new window.google.maps.LatLngBounds();
                 bounds.extend({ lat, lng });
@@ -305,8 +294,8 @@ const AIHealthAssistant = () => {
                                 <div className="flex space-x-3">
                                     <input
                                         type="text"
-                                        value={query}
-                                        onChange={(e) => setQuery(e.target.value)}
+                                        value={prompt}
+                                        onChange={(e) => setPrompt(e.target.value)}
                                         onKeyPress={handleKeyPress}
                                         placeholder="Type your health question here..."
                                         className="flex-1 px-6 py-3 border-2 border-purple-200 rounded-2xl focus:outline-none focus:border-purple-500 transition-colors duration-300"
@@ -314,7 +303,7 @@ const AIHealthAssistant = () => {
                                     />
                                     <button
                                         onClick={handleAIQuery}
-                                        disabled={loading || !query.trim()}
+                                        disabled={loading || !prompt.trim()}
                                         className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-2xl hover:from-purple-700 hover:to-pink-700 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 shadow-lg hover:shadow-xl"
                                     >
                                         {loading ? (

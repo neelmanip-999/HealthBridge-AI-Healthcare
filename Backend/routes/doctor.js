@@ -1,21 +1,31 @@
-// backend/routes/doctor.js
 const express = require('express');
 const router = express.Router();
 const doctorController = require('../controllers/doctorController');
-const auth = require('../middleware/auth'); // Assuming your auth middleware is set up
+const auth = require('../middleware/auth'); 
 
-// --- Authentication Routes (Unchanged) ---
+// --- PUBLIC ROUTES ---
+
+// 1. THIS WAS MISSING -> Fixes the 404 Error
+// @route GET /api/doctor
+router.get('/', doctorController.getAllDoctors); 
+
+// 2. Get specific doctor details
+// @route GET /api/doctor/profile/:id
+router.get('/profile/:id', doctorController.getDoctorProfileById);
+
+// 3. Register a new doctor
+// @route POST /api/doctor/register
 router.post('/register', doctorController.registerDoctor);
+
+// 4. Login doctor
+// @route POST /api/doctor/login
 router.post('/login', doctorController.loginDoctor);
 
-// --- Protected Routes (Requires JWT) ---
+
+// --- PROTECTED ROUTES (Requires Login) ---
+
+// 5. Update doctor status
+// @route PUT /api/doctor/status
 router.put('/status', auth, doctorController.updateStatus);
-
-// --- ADD THIS ROUTE FOR THE "Find Doctors" PAGE ---
-router.get('/all', auth, doctorController.getAllDoctors);
-
-// --- ADD THIS ROUTE TO FIX THE CHAT PAGE ERROR ---
-// This route matches the frontend's request: /api/doctor/profile/:id
-router.get('/profile/:id', auth, doctorController.getDoctorProfileById);
 
 module.exports = router;

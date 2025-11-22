@@ -25,13 +25,19 @@ mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log('MongoDB Connected...'))
     .catch(err => console.log('MongoDB Connection Error:', err));
 
+// --- Route Imports ---
 const doctorRoutes = require('./routes/doctor');
 const patientRoutes = require('./routes/patient');
 const chatRoutes = require('./routes/chat');
+const aiAssistantRoutes = require('./routes/aiAssistant');
+const mapsRoutes = require('./routes/maps');
 
+// --- API Endpoints ---
 app.use('/api/doctor', doctorRoutes);
 app.use('/api/patient', patientRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/ai', aiAssistantRoutes);
+app.use('/api/maps', mapsRoutes);
 
 const userSocketMap = {}; // { userId: socketId }
 
@@ -50,23 +56,16 @@ io.on('connection', (socket) => {
         }
     });
 
-    // --- THIS IS THE NEW LISTENER THAT NOTIFIES THE DOCTOR ---
     socket.on('startConsultation', (data) => {
-        // data: { doctorId, patient: { _id, name } }
         const doctorSocketId = userSocketMap[data.doctorId];
-
         if (doctorSocketId) {
             console.log(`Notifying Doctor ${data.doctorId} of new chat from Patient ${data.patient._id}`);
-            
-            // This event is what DoctorDashboard.jsx is waiting for.
             io.to(doctorSocketId).emit('consultationStarted', {
-                partner: data.patient, // The patient is the doctor's chat partner
-                sessionId: `${data.patient._id}-${data.doctorId}` // A unique ID for this chat session
+                partner: data.patient,
+                sessionId: `${data.patient._id}-${data.doctorId}`
             });
         } else {
             console.log(`Doctor ${data.doctorId} is not online. Cannot start consultation.`);
-            // Optional: You could emit an event back to the patient here.
-            // socket.emit('doctorOffline', { message: 'The doctor is currently offline.' });
         }
     });
 
@@ -78,7 +77,6 @@ io.on('connection', (socket) => {
                 senderRole: data.senderRole,
                 message: data.message,
             });
-
             const savedMessage = await newMessage.save();
             console.log('Message saved to DB:', savedMessage);
 
@@ -102,4 +100,3 @@ io.on('connection', (socket) => {
 });
 
 server.listen(PORT, () => console.log(`Server started on port ${PORT}`));
-

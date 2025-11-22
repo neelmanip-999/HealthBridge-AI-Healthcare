@@ -2,7 +2,7 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 // FIX: Changed 'Pills' to the correct icon name, 'Pill'
-import { HeartPulse, Stethoscope, Pill, Brain } from "lucide-react"; 
+import { HeartPulse, Stethoscope, Pill, Brain, MapPin } from "lucide-react"; 
 
 const PatientDashboard = () => {
     const navigate = useNavigate();
@@ -125,6 +125,15 @@ const PatientDashboard = () => {
                             icon={Brain}
                             colorClass="border-purple-500"
                             link="/patient/ai-assistant"
+                        />
+                    </div>
+                    <div style={{ animationDelay: '0.5s' }}>
+                        <DashboardCard
+                            title="Route Finder"
+                            description="Find routes to hospitals, pharmacies, and save your locations."
+                            icon={MapPin}
+                            colorClass="border-blue-500"
+                            link="/patient/map"
                         />
                     </div>
                 </div>

@@ -1,18 +1,23 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import ChatWindow from '../components/ChatWindow';
-import io from 'socket.io-client';
+import { useSocket } from '../context/SocketContext'; // <-- 1. Import the hook
 
-const SOCKET_SERVER_URL = "http://localhost:5000";
+const LoadingSpinner = () => (
+    <div className="flex items-center justify-center h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-indigo-500"></div>
+    </div>
+);
 
 const Chat = () => {
     const { doctorId } = useParams();
     const navigate = useNavigate();
+    // --- THE FIX IS HERE ---
+    const { socket } = useSocket(); // <-- 2. Destructure to get the actual socket instance
     const [doctor, setDoctor] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const socket = useRef(null);
 
     const currentUser = JSON.parse(localStorage.getItem('user'));
 
@@ -32,44 +37,28 @@ const Chat = () => {
         fetchDoctorData();
     }, [doctorId]);
 
-    // Effect to manage the socket connection and notify the server
+    // Effect to notify the doctor that a consultation is starting
     useEffect(() => {
-        // Wait until we have both the doctor's info and the current user's info
-        if (!doctor || !currentUser?.id) return;
-
-        // Initialize and connect the socket
-        socket.current = io(SOCKET_SERVER_URL, {
-            auth: { userId: currentUser.id },
-            transports: ['websocket']
-        });
-
-        // Once connected, emit the event to start the consultation
-        socket.current.on('connect', () => {
-            console.log("Patient socket connected. Emitting startConsultation.");
-            socket.current.emit('startConsultation', {
+        // Wait until the shared socket, doctor data, and user data are all available
+        if (socket && doctor && currentUser?._id) {
+            console.log("Patient chat page is ready. Emitting startConsultation.");
+            socket.emit('startConsultation', {
                 doctorId: doctor._id,
                 patient: {
-                    _id: currentUser.id, // Ensure your localStorage user has 'id'
-                    name: currentUser.name // Ensure your localStorage user has 'name'
+                    // Send patient info so the doctor's UI can display the name
+                    _id: currentUser._id,
+                    name: currentUser.name
                 }
             });
-        });
-
-        // Cleanup: disconnect the socket when the component is unmounted
-        return () => {
-            if (socket.current) {
-                socket.current.disconnect();
-            }
-        };
-    }, [doctor, currentUser?.id]); // This effect re-runs if the doctor or user changes
-
+        }
+    }, [socket, doctor, currentUser?._id]); // Re-run if any of these change
 
     const handleEndChat = () => {
         navigate('/patient/dashboard');
     };
 
     if (loading) {
-        return <div className="text-center p-10 font-bold">Loading Doctor Profile...</div>;
+        return <LoadingSpinner />;
     }
 
     if (error) {
@@ -86,12 +75,14 @@ const Chat = () => {
 
     return (
         <div className="w-full h-screen p-4 bg-gray-100">
-            {doctor && (
+            {doctor ? (
                 <ChatWindow
                     partner={doctor}
                     onEndChat={handleEndChat}
                     userRole="patient"
                 />
+            ) : (
+                 <p className="text-center">Loading chat...</p>
             )}
         </div>
     );

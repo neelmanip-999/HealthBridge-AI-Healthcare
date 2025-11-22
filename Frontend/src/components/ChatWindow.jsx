@@ -1,20 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MessageSquare, Send, X } from 'lucide-react';
-import io from 'socket.io-client';
-import api from '../services/api'; // Ensure this path is correct
-
-const SOCKET_SERVER_URL = "http://localhost:5000";
+import api from '../services/api';
+import { useSocket } from '../context/SocketContext'; // <-- Use the shared context
 
 const ChatWindow = ({ partner, onEndChat, userRole }) => {
+    const { socket, isConnected } = useSocket(); // <-- Get shared socket and connection status
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
-    const [isConnected, setIsConnected] = useState(false);
     const messagesEndRef = useRef(null);
-    const socket = useRef(null);
 
     const currentUser = JSON.parse(localStorage.getItem('user'));
-    // Make sure currentUser from localStorage has an 'id' property
-    const currentUserId = currentUser?.id; 
+    const currentUserId = currentUser?._id; // <-- FIX: Use _id to match MongoDB
     const isDoctor = userRole === 'doctor';
 
     const scrollToBottom = () => {
@@ -23,9 +19,7 @@ const ChatWindow = ({ partner, onEndChat, userRole }) => {
 
     // Effect for fetching initial chat history
     useEffect(() => {
-        // --- FIX: Use partner._id to fetch history ---
         if (!currentUserId || !partner?._id) return;
-
         const fetchHistory = async () => {
             try {
                 const response = await api.get(`/chat/history/${currentUserId}/${partner._id}`);
@@ -37,50 +31,37 @@ const ChatWindow = ({ partner, onEndChat, userRole }) => {
         fetchHistory();
     }, [currentUserId, partner._id]);
 
-    // Effect for managing socket connection
+    // Effect for listening to incoming messages on the shared socket
     useEffect(() => {
-        if (!currentUserId) return;
+        if (!socket) return;
 
-        socket.current = io(SOCKET_SERVER_URL, {
-            autoConnect: false,
-            transports: ['websocket'],
-            auth: { userId: currentUserId }
-        });
-
-        socket.current.connect();
-        socket.current.on('connect', () => setIsConnected(true));
-        socket.current.on('receiveMessage', (message) => {
+        const handleReceiveMessage = (message) => {
+            // Add the new message to the state
             setMessages((prev) => [...prev, message]);
-        });
-        socket.current.on('consultationEnded', () => {
-            window.alert(`${partner.name} has ended the consultation.`);
-            onEndChat();
-        });
-
-        return () => {
-            if (socket.current) {
-                socket.current.disconnect();
-                setIsConnected(false);
-            }
         };
-    }, [currentUserId, partner.name, onEndChat]);
+
+        socket.on('receiveMessage', handleReceiveMessage);
+
+        // Cleanup the listener when the component unmounts
+        return () => {
+            socket.off('receiveMessage', handleReceiveMessage);
+        };
+    }, [socket]); // Re-run only if the socket instance changes
 
     useEffect(scrollToBottom, [messages]);
 
     const sendMessage = (e) => {
         e.preventDefault();
-        if (input.trim() === '' || !socket.current || !isConnected) return;
+        if (input.trim() === '' || !socket || !isConnected) return;
 
         const messageData = {
             senderId: currentUserId,
-            // --- THE FIX IS HERE ---
-            // Use partner._id which comes from the MongoDB document
             receiverId: partner._id,
             senderRole: userRole,
             message: input.trim(),
         };
 
-        socket.current.emit('sendMessage', messageData);
+        socket.emit('sendMessage', messageData);
         setInput('');
     };
 
@@ -90,9 +71,8 @@ const ChatWindow = ({ partner, onEndChat, userRole }) => {
             if (isDoctor) {
                 await api.put('/doctor/status', { status: 'free' });
             }
-            if (socket.current) {
-                // --- FIX: Use partner._id to end consultation ---
-                socket.current.emit('endConsultation', { partnerId: partner._id });
+            if (socket) {
+                socket.emit('endConsultation', { partnerId: partner._id });
             }
             onEndChat();
         } catch (err) {
@@ -105,7 +85,6 @@ const ChatWindow = ({ partner, onEndChat, userRole }) => {
         return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     };
 
-    // --- JSX (Unchanged) ---
     return (
         <div className="flex flex-col h-full bg-white rounded-3xl shadow-xl">
             <div className="p-4 border-b flex justify-between items-center">
@@ -120,8 +99,8 @@ const ChatWindow = ({ partner, onEndChat, userRole }) => {
                 </div>
             </div>
             <div className="flex-grow p-4 overflow-y-auto space-y-4">
-                {messages.map((msg) => (
-                    <div key={msg._id} className={`flex ${msg.senderId === currentUserId ? 'justify-end' : 'justify-start'}`}>
+                {messages.map((msg, index) => (
+                    <div key={msg._id || index} className={`flex ${msg.senderId === currentUserId ? 'justify-end' : 'justify-start'}`}>
                         <div className={`max-w-md p-3 rounded-xl shadow-md ${msg.senderId === currentUserId ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-gray-200 rounded-tl-none'}`}>
                             <p>{msg.message}</p>
                             <span className={`text-xs mt-1 block ${msg.senderId === currentUserId ? 'text-indigo-200' : 'text-gray-500'}`}>
@@ -150,3 +129,4 @@ const ChatWindow = ({ partner, onEndChat, userRole }) => {
 };
 
 export default ChatWindow;
+

@@ -1,0 +1,20 @@
+{
+  "feature_names": [
+    "Age",
+    "Gender",
+    "BloodPressure",
+    "Cholesterol",
+    "Glucose",
+    "HeartRate",
+    "BMI",
+    "Fever",
+    "Cough",
+    "Fatigue",
+    "Headache",
+    "Nausea",
+    "ShortnessBreath"
+  ],
+  "model_type": "RandomForestClassifier",
+  "trained_at": "2025-11-23T01:43:38.932201",
+  "n_features": 13
+}

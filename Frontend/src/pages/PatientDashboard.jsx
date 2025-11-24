@@ -6,6 +6,7 @@ import {
   Pill,
   Brain,
   FileText,
+  MapPin,
   Calendar,
   Clock,
   Video,
@@ -72,6 +73,11 @@ const COLOR_MAP = {
     border: "border-green-500",
     iconBg: "bg-green-100",
     iconColor: "text-green-600",
+  },
+  teal: {
+    border: "border-teal-500",
+    iconBg: "bg-teal-100",
+    iconColor: "text-teal-600",
   },
 };
 
@@ -235,7 +241,7 @@ const PatientDashboard = () => {
       </header>
 
       <main className="max-w-7xl mx-auto">
-        {/* Dashboard cards - use 3 columns on large screens so the 5th card sits centered */}
+        {/* Dashboard cards - use 3 columns on large screens */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           <DashboardCard
             title="Find a Doctor"
@@ -269,16 +275,21 @@ const PatientDashboard = () => {
             onClick={() => navigate("/patient/ai-assistant")}
           />
 
-          {/* Center the Report Analysis card on lg screens */}
-          <div className="lg:col-start-2">
-            <DashboardCard
-              title="Report Analysis"
-              Icon={FileText}
-              colorKey="green"
-              description="AI-powered analysis of your medical reports and lab results."
-              onClick={() => navigate("/patient/report-analysis")}
-            />
-          </div>
+          <DashboardCard
+            title="Report Analysis"
+            Icon={FileText}
+            colorKey="green"
+            description="AI-powered analysis of your medical reports and lab results."
+            onClick={() => navigate("/patient/report-analysis")}
+          />
+
+          <DashboardCard
+            title="Route Finder"
+            Icon={MapPin}
+            colorKey="teal"
+            description="Find routes to hospitals, pharmacies, and save your locations."
+            onClick={() => navigate("/patient/map")}
+          />
         </div>
 
         {/* Consultations / Appointments */}

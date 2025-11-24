@@ -13,6 +13,7 @@ import PatientDashboard from './pages/PatientDashboard';
 import FindDoctors from './pages/FindDoctors';
 import AIHealthAssistant from './pages/AIHealthAssistant';
 import ReportAnalysis from './pages/ReportAnalysis';
+import MapPage from './pages/MapPage';
 import Chat from './pages/chat';
 import PharmacyLogin from './pages/PharmacyLogin';
 import PharmacyRegister from './pages/PharmacyRegister';
@@ -65,6 +66,10 @@ const App = () => {
                     <Route 
                         path="/patient/report-analysis" 
                         element={<ProtectedRoute role="patient"><ReportAnalysis /></ProtectedRoute>} 
+                    />
+                    <Route 
+                        path="/patient/map" 
+                        element={<ProtectedRoute role="patient"><MapPage /></ProtectedRoute>} 
                     />
                     <Route 
                         path="/patient/chat/:doctorId" 

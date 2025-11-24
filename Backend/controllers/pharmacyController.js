@@ -77,13 +77,32 @@ exports.loginPharmacy = async (req, res) => {
 // POST /pharmacy/add
 exports.addMedicine = async (req, res) => {
     const { error } = pharmacyAddValidation.validate(req.body);
-    if (error) return res.status(400).send({ message: error.details[0].message });
+    if (error) {
+        return res.status(400).send({ 
+            message: error.details[0].message || 'Validation error',
+            details: error.details
+        });
+    }
 
     try {
-        const newMedicine = new Pharmacy(req.body);
+        // Get pharmacy name from the logged-in user
+        const pharmacyUser = await PharmacyUser.findById(req.user.id);
+        if (!pharmacyUser) return res.status(404).send({ message: 'Pharmacy user not found.' });
+
+        // Set pharmacistName to the logged-in pharmacy's name
+        const medicineData = {
+            medicineName: req.body.medicineName,
+            stock: req.body.stock,
+            price: req.body.price,
+            expiryDate: req.body.expiryDate,
+            pharmacistName: pharmacyUser.name
+        };
+
+        const newMedicine = new Pharmacy(medicineData);
         await newMedicine.save();
         res.status(201).send({ message: 'Medicine added successfully', medicine: newMedicine });
     } catch (err) {
+        console.error('Error adding medicine:', err);
         res.status(500).send({ message: 'Server error adding medicine.', error: err.message });
     }
 };
@@ -91,8 +110,13 @@ exports.addMedicine = async (req, res) => {
 // GET /pharmacy/list
 exports.listMedicines = async (req, res) => {
     try {
+        // Get pharmacy name from the logged-in user
+        const pharmacyUser = await PharmacyUser.findById(req.user.id);
+        if (!pharmacyUser) return res.status(404).send({ message: 'Pharmacy user not found.' });
+
+        // Return all medicines (for viewing) but include pharmacy name for frontend filtering
         const medicines = await Pharmacy.find({});
-        res.send(medicines);
+        res.send({ medicines, currentPharmacyName: pharmacyUser.name });
     } catch (err) {
         res.status(500).send({ message: 'Server error listing medicines.' });
     }
@@ -104,12 +128,29 @@ exports.updateMedicine = async (req, res) => {
     if (error) return res.status(400).send({ message: error.details[0].message });
 
     try {
+        // Get pharmacy name from the logged-in user
+        const pharmacyUser = await PharmacyUser.findById(req.user.id);
+        if (!pharmacyUser) return res.status(404).send({ message: 'Pharmacy user not found.' });
+
+        // Check if medicine exists and belongs to this pharmacy
+        const medicine = await Pharmacy.findById(req.params.id);
+        if (!medicine) return res.status(404).send({ message: 'Medicine not found.' });
+        
+        if (medicine.pharmacistName !== pharmacyUser.name) {
+            return res.status(403).send({ message: 'You can only update your own medicines.' });
+        }
+
+        // Update medicine (ensure pharmacistName stays the same)
+        const updateData = {
+            ...req.body,
+            pharmacistName: pharmacyUser.name // Ensure it can't be changed
+        };
+
         const updatedMed = await Pharmacy.findByIdAndUpdate(
             req.params.id, 
-            req.body, 
+            updateData, 
             { new: true, runValidators: true }
         );
-        if (!updatedMed) return res.status(404).send({ message: 'Medicine not found.' });
         res.send({ message: 'Medicine updated successfully', medicine: updatedMed });
     } catch (err) {
         res.status(500).send({ message: 'Server error updating medicine.' });
@@ -119,8 +160,19 @@ exports.updateMedicine = async (req, res) => {
 // DELETE /pharmacy/delete/:id
 exports.deleteMedicine = async (req, res) => {
     try {
+        // Get pharmacy name from the logged-in user
+        const pharmacyUser = await PharmacyUser.findById(req.user.id);
+        if (!pharmacyUser) return res.status(404).send({ message: 'Pharmacy user not found.' });
+
+        // Check if medicine exists and belongs to this pharmacy
+        const medicine = await Pharmacy.findById(req.params.id);
+        if (!medicine) return res.status(404).send({ message: 'Medicine not found.' });
+        
+        if (medicine.pharmacistName !== pharmacyUser.name) {
+            return res.status(403).send({ message: 'You can only delete your own medicines.' });
+        }
+
         const deletedMed = await Pharmacy.findByIdAndDelete(req.params.id);
-        if (!deletedMed) return res.status(404).send({ message: 'Medicine not found.' });
         res.send({ message: 'Medicine deleted successfully' });
     } catch (err) {
         res.status(500).send({ message: 'Server error deleting medicine.' });

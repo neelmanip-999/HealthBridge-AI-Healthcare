@@ -4,23 +4,27 @@ const { Server } = require('socket.io');
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const cors = require('cors');
-const Chat = require('./models/Chat');
+const Chat = require('./models/Chat'); // Ensure this path is correct
 
 dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
+
+// Setup Socket.IO with CORS
 const io = new Server(server, {
     cors: {
         origin: "http://localhost:5173", // Your React app's URL
-        methods: ["GET", "POST", "PUT", "DELETE"], // Added DELETE for completeness
+        methods: ["GET", "POST", "PUT", "DELETE"],
     }
 });
+
 const PORT = process.env.PORT || 5000;
 
 app.use(cors());
 app.use(express.json());
 
+// Connect to MongoDB
 mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log('MongoDB Connected...'))
     .catch(err => console.log('MongoDB Connection Error:', err));
@@ -30,25 +34,33 @@ const doctorRoutes = require('./routes/doctor');
 const patientRoutes = require('./routes/patient');
 const chatRoutes = require('./routes/chat');
 const aiAssistantRoutes = require('./routes/aiAssistant');
-const appointmentRoutes = require('./routes/appointment'); 
+const appointmentRoutes = require('./routes/appointment');
+const reportAnalysisRoutes = require('./routes/reportAnalysis');
+const pharmacyRoutes = require('./routes/pharmacy');
 
 // --- API Endpoints ---
 app.use('/api/doctor', doctorRoutes);
 app.use('/api/patient', patientRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/ai', aiAssistantRoutes);
-app.use('/api/appointments', appointmentRoutes); 
+app.use('/api/appointments', appointmentRoutes);
+app.use('/api/reports', reportAnalysisRoutes);
+app.use('/api/pharmacy', pharmacyRoutes);
 
 const userSocketMap = {}; // { userId: socketId }
 
 io.on('connection', (socket) => {
+    // NOTE: This part is crucial for mapping user IDs to socket IDs
+    // Ensure your frontend passes { auth: { userId: '...' } }
     const userId = socket.handshake.auth.userId;
+    
     if (userId) {
         userSocketMap[userId] = socket.id;
         console.log(`User connected: ${userId} with socket ID: ${socket.id}`);
     }
 
     // --- ROOM LOGIC ---
+    // The client calls this when they open a chat window
     socket.on('join_room', (room) => {
         socket.join(room);
         console.log(`User ${socket.id} joined room: ${room}`);
@@ -91,28 +103,33 @@ io.on('connection', (socket) => {
     socket.on('sendMessage', async (data) => {
         try {
             // Create new message object
-            // We let MongoDB handle the _id
             const newMessage = new Chat({
                 senderId: data.senderId,
                 receiverId: data.receiverId,
                 senderRole: data.senderRole,
                 message: data.message,
-                timestamp: data.timestamp || Date.now() // Use client time or server time
+                timestamp: data.timestamp || Date.now() 
             });
 
             // Save to Database (Persistence)
             const savedMessage = await newMessage.save();
             console.log('Message saved to DB:', savedMessage._id);
 
-            // Emit to Receiver (if online)
-            const receiverSocketId = userSocketMap[data.receiverId];
-            if (receiverSocketId) {
-                io.to(receiverSocketId).emit('receiveMessage', savedMessage);
-            }
+            // Use the roomId passed from the client
+            const roomId = data.roomId; 
             
-            // Emit back to Sender (Confirmation/Echo)
-            // This is crucial because we removed the optimistic update in the frontend
-            socket.emit('receiveMessage', savedMessage);
+            if (roomId) {
+                // Emit to ALL sockets in the specified room (sender AND receiver)
+                io.to(roomId).emit('receiveMessage', savedMessage);
+            } else {
+                console.warn(`Message ${savedMessage._id} sent without a room ID. Using fallback.`);
+                // Fallback (for older clients or error)
+                socket.emit('receiveMessage', savedMessage); // Echo to sender
+                const receiverSocketId = userSocketMap[data.receiverId];
+                if (receiverSocketId) {
+                    io.to(receiverSocketId).emit('receiveMessage', savedMessage);
+                }
+            }
 
         } catch (error) {
             console.error('Error handling message:', error);

@@ -46,4 +46,15 @@ export const getPatientAppointments = () => api.get('/appointments/patient');
 // 5. Cancel Appointment
 export const cancelAppointment = (id) => api.delete(`/appointments/${id}`);
 
+// 6. Report Analysis
+export const analyzeReport = (reportData) => api.post('/reports/analyze', reportData);
+export const analyzeBatchReports = (reports) => api.post('/reports/analyze/batch', { reports });
+export const checkMLServiceHealth = () => api.get('/reports/health');
+
+// 7. Pharmacy Operations
+export const getMedicines = () => api.get('/pharmacy/list');
+export const addMedicine = (data) => api.post('/pharmacy/add', data);
+export const updateMedicine = (id, data) => api.put(`/pharmacy/update/${id}`, data);
+export const deleteMedicine = (id) => api.delete(`/pharmacy/delete/${id}`);
+
 export default api;

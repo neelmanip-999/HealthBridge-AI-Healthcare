@@ -3,6 +3,17 @@ import { MessageSquare, Send, X } from 'lucide-react';
 import api from '../services/api';
 import { useSocket } from '../context/SocketContext';
 
+// Function to create a consistent Room ID regardless of who is user1 and user2.
+// This is CRITICAL for room-based messaging.
+const getChatRoomId = (id1, id2) => {
+    // Ensure both IDs are strings before sorting
+    const strId1 = String(id1);
+    const strId2 = String(id2);
+    // Sort the IDs to ensure the room name is always consistent (e.g., 'A-B' not 'B-A')
+    const sortedIds = [strId1, strId2].sort();
+    return `${sortedIds[0]}-${sortedIds[1]}`;
+};
+
 const ChatWindow = ({ partner, onEndChat, userRole }) => {
     const { socket, isConnected } = useSocket();
     const [messages, setMessages] = useState([]);
@@ -11,11 +22,12 @@ const ChatWindow = ({ partner, onEndChat, userRole }) => {
 
     const currentUser = JSON.parse(localStorage.getItem('user'));
     
-    // --- FIX 1: ROBUST ID CHECK ---
-    // Handles both mongo '_id' and normalized 'id'
+    // Get the current user ID, handling both '_id' and 'id' fields
     const currentUserId = currentUser?._id || currentUser?.id; 
-    
     const isDoctor = userRole === 'doctor';
+    
+    // Get the consistent room ID
+    const roomId = getChatRoomId(currentUserId, partner._id);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -27,7 +39,7 @@ const ChatWindow = ({ partner, onEndChat, userRole }) => {
 
         const fetchHistory = async () => {
             try {
-                // Ensure we aren't sending "undefined" in the URL
+                // Ensure IDs are consistent with what the backend expects
                 const response = await api.get(`/chat/history/${currentUserId}/${partner._id}`);
                 setMessages(response.data);
             } catch (error) {
@@ -37,22 +49,36 @@ const ChatWindow = ({ partner, onEndChat, userRole }) => {
         fetchHistory();
     }, [currentUserId, partner._id]);
 
-    // 2. Listen for Incoming Messages
+    // 2. Listen for Incoming Messages & Join Room
     useEffect(() => {
-        if (!socket) return;
+        if (!socket || !currentUserId || !partner?._id) return;
+
+        // **CRITICAL FIX 1: JOIN ROOM**
+        // Tell the server which room this socket should listen to
+        socket.emit('join_room', roomId); 
 
         const handleReceiveMessage = (message) => {
-            // FIX: We rely purely on the server to send the message back.
-            // This avoids the "duplicate message" bug caused by optimistic updates.
-            setMessages((prev) => [...prev, message]);
+            // Check if the received message belongs to this current chat window
+            // This is a safety check since the server now broadcasts to a room.
+            const participantsMatch = 
+                (message.senderId === currentUserId && message.receiverId === partner._id) ||
+                (message.senderId === partner._id && message.receiverId === currentUserId);
+
+            if (participantsMatch) {
+                // **FIX 2: RELY ON SERVER ECHO**
+                // Add the message only once (when confirmed and returned by the server)
+                setMessages((prev) => [...prev, message]);
+            }
         };
 
         socket.on('receiveMessage', handleReceiveMessage);
 
         return () => {
+            // Clean up listener when the component unmounts or partner changes
             socket.off('receiveMessage', handleReceiveMessage);
+            // Optional: socket.emit('leave_room', roomId);
         };
-    }, [socket]);
+    }, [socket, currentUserId, partner._id, roomId]); // Dependency array includes roomId
 
     // Scroll on new message
     useEffect(scrollToBottom, [messages]);
@@ -66,13 +92,12 @@ const ChatWindow = ({ partner, onEndChat, userRole }) => {
             receiverId: partner._id,
             senderRole: userRole,
             message: input.trim(),
-            timestamp: new Date().toISOString() // Add timestamp for local display
+            timestamp: new Date().toISOString(),
+            // **CRITICAL FIX 3: INCLUDE ROOM ID**
+            roomId: roomId, 
         };
 
-        // --- FIX 2: REMOVED OPTIMISTIC UPDATE ---
-        // Previously, we added the message locally AND waited for the server.
-        // This caused duplicates. Now we just emit and wait for the echo.
-        
+        // Emit the message and wait for the server to save it, then echo it back to us.
         socket.emit('sendMessage', messageData);
         setInput('');
     };
@@ -84,7 +109,9 @@ const ChatWindow = ({ partner, onEndChat, userRole }) => {
                 await api.put('/doctor/status', { status: 'free' });
             }
             if (socket) {
+                // Notifying the partner and server
                 socket.emit('endConsultation', { partnerId: partner._id });
+                // Optional: socket.emit('leave_room', roomId);
             }
             onEndChat();
         } catch (err) {
@@ -133,9 +160,10 @@ const ChatWindow = ({ partner, onEndChat, userRole }) => {
                 )}
                 
                 {messages.map((msg, index) => {
-                    const isMe = msg.senderId === currentUserId;
+                    // Check senderId against currentUserId, handling both ObjectId and string comparison
+                    const isMe = String(msg.senderId) === String(currentUserId);
                     return (
-                        <div key={index} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                        <div key={msg._id || index} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                             <div className={`max-w-[75%] p-3 rounded-2xl shadow-sm relative ${
                                 isMe 
                                 ? 'bg-indigo-600 text-white rounded-br-none' 

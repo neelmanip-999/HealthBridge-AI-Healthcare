@@ -13,7 +13,7 @@ const DoctorSchema = new mongoose.Schema({
     default: "https://cdn-icons-png.flaticon.com/512/377/377429.png" 
   },
   
-  // CRITICAL FOR BOOKING: Defines when the doctor is available
+  // //CRITICAL FOR BOOKING: Defines when the doctor is available
   availableSlots: [
     {
       day: { type: String }, // e.g., "Monday"

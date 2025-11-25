@@ -32,6 +32,16 @@ const AppointmentSchema = new mongoose.Schema({
   paymentId: { 
     type: String // Stores the Razorpay/Stripe Payment ID
   },
+  // --- NEW FIELDS FOR MEDICAL HISTORY ---
+  diagnosis: {
+    type: String, // Doctor adds this after consultation
+    default: ''
+  },
+  prescription: {
+    type: String, // Doctor adds this after consultation
+    default: ''
+  },
+  // -------------------------------------
   createdAt: { 
     type: Date, 
     default: Date.now 

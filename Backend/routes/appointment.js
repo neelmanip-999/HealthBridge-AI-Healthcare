@@ -28,4 +28,9 @@ router.get('/patient', auth, appointmentController.getPatientAppointments);
 // @access  Private
 router.delete('/:id', auth, appointmentController.cancelAppointment);
 
+// @route   POST /api/appointments/complete
+// @desc    Mark appointment as completed and save diagnosis/prescription (NEW)
+// @access  Private (Doctor only)
+router.post('/complete', auth, appointmentController.completeAppointment);
+
 module.exports = router;

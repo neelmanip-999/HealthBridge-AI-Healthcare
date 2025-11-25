@@ -45,8 +45,7 @@ function useAppointments() {
 }
 
 /**
- * Tailwind-safe color map (no dynamic template strings)
- * Each entry returns an object with utility classes for icon bg, icon color and border color.
+ * Tailwind-safe color map
  */
 const COLOR_MAP = {
   indigo: {
@@ -167,7 +166,7 @@ const AppointmentCard = ({ apt, onJoin, onCancel }) => {
 };
 
 /**
- * Main PatientDashboard component (refactored)
+ * Main PatientDashboard component
  */
 const PatientDashboard = () => {
   const navigate = useNavigate();
@@ -179,11 +178,9 @@ const PatientDashboard = () => {
   }, [fetch]);
 
   const handleCancel = async (id) => {
-    // optimistic UI: ask first, then call API
     if (!window.confirm("Are you sure you want to cancel this appointment?")) return;
 
     try {
-      // optional: show a small spinner or disable button (not implemented here)
       await cancelAppointment(id);
       remove(id);
     } catch (err) {
@@ -193,7 +190,6 @@ const PatientDashboard = () => {
   };
 
   const handleJoin = (appointment) => {
-    // navigate to chat page with doctor data in state
     navigate(`/patient/chat/${appointment.doctorId._id}`, { state: { doctorData: appointment.doctorId } });
   };
 
@@ -202,10 +198,6 @@ const PatientDashboard = () => {
     localStorage.removeItem("user");
     navigate("/");
   };
-
-  // small helper for layout: center the Report Analysis card by making grid 3 columns on lg screens
-  // and placing the report analysis card in the center column using lg:col-start-2 for the 5th item
-  // We'll mark that card manually below.
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 p-6 md:p-10 relative overflow-hidden">
@@ -241,7 +233,7 @@ const PatientDashboard = () => {
       </header>
 
       <main className="max-w-7xl mx-auto">
-        {/* Dashboard cards - use 3 columns on large screens */}
+        {/* Dashboard cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           <DashboardCard
             title="Find a Doctor"
@@ -256,7 +248,7 @@ const PatientDashboard = () => {
             Icon={HeartPulse}
             colorKey="red"
             description="Review and update your past records."
-            onClick={() => navigate("/patient/history")}
+            onClick={() => navigate("/patient/medical-history")} // FIXED: Matches App.jsx
           />
 
           <DashboardCard
@@ -264,7 +256,7 @@ const PatientDashboard = () => {
             Icon={Pill}
             colorKey="yellow"
             description="Browse available medicines and prices."
-            onClick={() => navigate("/patient/pharmacy")}
+            onClick={() => navigate("/patient/pharmacy-catalog")} // FIXED: Matches App.jsx
           />
 
           <DashboardCard

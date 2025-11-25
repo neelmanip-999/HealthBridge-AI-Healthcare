@@ -1,16 +1,21 @@
 // HealthBridge/backend/controllers/pharmacyController.js
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const Pharmacy = require('../models/Pharmacy');
-const PharmacyUser = require('../models/PharmacyUser');
+const PharmacyUser = require('../models/PharmacyUser'); // User Auth Model
+const Medicine = require('../models/Medicine');         // NEW: Inventory Model
+const Order = require('../models/Order');               // NEW: Order Model
 const { pharmacyAddValidation } = require('../validations/pharmacyValidation');
 
 // Shared function to generate JWT
 const generateToken = (id) => {
   return jwt.sign({ id, role: 'pharmacy' }, process.env.JWT_SECRET, {
-    expiresIn: '1d', // Token expires in 1 day
+    expiresIn: '1d',
   });
 };
+
+// ==========================================
+// 1. AUTHENTICATION (Login & Register)
+// ==========================================
 
 // POST /pharmacy/register
 exports.registerPharmacy = async (req, res) => {
@@ -74,8 +79,24 @@ exports.loginPharmacy = async (req, res) => {
   }
 };
 
+// ==========================================
+// 2. INVENTORY MANAGEMENT (Seller Dashboard)
+// ==========================================
+
+// GET /pharmacy/inventory
+// Get only the medicines belonging to the logged-in pharmacy
+exports.getPharmacyInventory = async (req, res) => {
+    try {
+        const medicines = await Medicine.find({ pharmacyId: req.user.id });
+        res.json(medicines);
+    } catch (err) {
+        res.status(500).json({ message: 'Server error fetching inventory.' });
+    }
+};
+
 // POST /pharmacy/add
 exports.addMedicine = async (req, res) => {
+    // Validate incoming data
     const { error } = pharmacyAddValidation.validate(req.body);
     if (error) {
         return res.status(400).send({ 
@@ -85,71 +106,53 @@ exports.addMedicine = async (req, res) => {
     }
 
     try {
-        // Get pharmacy name from the logged-in user
         const pharmacyUser = await PharmacyUser.findById(req.user.id);
         if (!pharmacyUser) return res.status(404).send({ message: 'Pharmacy user not found.' });
 
-        // Set pharmacistName to the logged-in pharmacy's name
-        const medicineData = {
-            medicineName: req.body.medicineName,
-            stock: req.body.stock,
+        // Create new Medicine linked to this Pharmacy ID
+        // Note: Mapping 'medicineName' from your validation to 'name' in our new model
+        const newMedicine = new Medicine({
+            pharmacyId: req.user.id, 
+            name: req.body.medicineName || req.body.name, 
             price: req.body.price,
+            stock: req.body.stock,
             expiryDate: req.body.expiryDate,
-            pharmacistName: pharmacyUser.name
-        };
+            category: req.body.category || 'General',
+            description: req.body.description || ''
+        });
 
-        const newMedicine = new Pharmacy(medicineData);
-        await newMedicine.save();
-        res.status(201).send({ message: 'Medicine added successfully', medicine: newMedicine });
+        const savedMedicine = await newMedicine.save();
+        res.status(201).send({ message: 'Medicine added successfully', medicine: savedMedicine });
     } catch (err) {
         console.error('Error adding medicine:', err);
         res.status(500).send({ message: 'Server error adding medicine.', error: err.message });
     }
 };
 
-// GET /pharmacy/list
-exports.listMedicines = async (req, res) => {
-    try {
-        // Get pharmacy name from the logged-in user
-        const pharmacyUser = await PharmacyUser.findById(req.user.id);
-        if (!pharmacyUser) return res.status(404).send({ message: 'Pharmacy user not found.' });
-
-        // Return all medicines (for viewing) but include pharmacy name for frontend filtering
-        const medicines = await Pharmacy.find({});
-        res.send({ medicines, currentPharmacyName: pharmacyUser.name });
-    } catch (err) {
-        res.status(500).send({ message: 'Server error listing medicines.' });
-    }
-};
-
 // PUT /pharmacy/update/:id
 exports.updateMedicine = async (req, res) => {
-    const { error } = pharmacyAddValidation.validate(req.body); // Reuse validation
-    if (error) return res.status(400).send({ message: error.details[0].message });
-
     try {
-        // Get pharmacy name from the logged-in user
-        const pharmacyUser = await PharmacyUser.findById(req.user.id);
-        if (!pharmacyUser) return res.status(404).send({ message: 'Pharmacy user not found.' });
-
-        // Check if medicine exists and belongs to this pharmacy
-        const medicine = await Pharmacy.findById(req.params.id);
-        if (!medicine) return res.status(404).send({ message: 'Medicine not found.' });
+        // Find medicine and ensure it belongs to the logged-in pharmacy
+        const medicine = await Medicine.findOne({ _id: req.params.id, pharmacyId: req.user.id });
         
-        if (medicine.pharmacistName !== pharmacyUser.name) {
-            return res.status(403).send({ message: 'You can only update your own medicines.' });
+        if (!medicine) {
+            return res.status(404).send({ message: 'Medicine not found or unauthorized.' });
         }
 
-        // Update medicine (ensure pharmacistName stays the same)
+        // Update fields
         const updateData = {
-            ...req.body,
-            pharmacistName: pharmacyUser.name // Ensure it can't be changed
+            name: req.body.medicineName || req.body.name,
+            price: req.body.price,
+            stock: req.body.stock,
+            expiryDate: req.body.expiryDate,
+            category: req.body.category,
+            description: req.body.description
         };
 
-        const updatedMed = await Pharmacy.findByIdAndUpdate(
+        const updatedMed = await Medicine.findByIdAndUpdate(
             req.params.id, 
-            updateData, 
-            { new: true, runValidators: true }
+            { $set: updateData }, 
+            { new: true }
         );
         res.send({ message: 'Medicine updated successfully', medicine: updatedMed });
     } catch (err) {
@@ -160,21 +163,52 @@ exports.updateMedicine = async (req, res) => {
 // DELETE /pharmacy/delete/:id
 exports.deleteMedicine = async (req, res) => {
     try {
-        // Get pharmacy name from the logged-in user
-        const pharmacyUser = await PharmacyUser.findById(req.user.id);
-        if (!pharmacyUser) return res.status(404).send({ message: 'Pharmacy user not found.' });
+        const deletedMed = await Medicine.findOneAndDelete({ 
+            _id: req.params.id, 
+            pharmacyId: req.user.id // Ensure ownership
+        });
 
-        // Check if medicine exists and belongs to this pharmacy
-        const medicine = await Pharmacy.findById(req.params.id);
-        if (!medicine) return res.status(404).send({ message: 'Medicine not found.' });
-        
-        if (medicine.pharmacistName !== pharmacyUser.name) {
-            return res.status(403).send({ message: 'You can only delete your own medicines.' });
-        }
+        if (!deletedMed) return res.status(404).send({ message: 'Medicine not found or unauthorized.' });
 
-        const deletedMed = await Pharmacy.findByIdAndDelete(req.params.id);
         res.send({ message: 'Medicine deleted successfully' });
     } catch (err) {
         res.status(500).send({ message: 'Server error deleting medicine.' });
+    }
+};
+
+// ==========================================
+// 3. ORDER MANAGEMENT (Click & Collect)
+// ==========================================
+
+// GET /pharmacy/orders
+// Get all incoming orders for this pharmacy
+exports.getPharmacyOrders = async (req, res) => {
+    try {
+        const orders = await Order.find({ pharmacyId: req.user.id })
+            .populate('patientId', 'name email') // Show who ordered it
+            .sort({ orderDate: -1 }); // Newest first
+        res.json(orders);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
+
+// PUT /pharmacy/orders/:id/status
+// Update order status (e.g., Mark as Ready)
+exports.updateOrderStatus = async (req, res) => {
+    try {
+        const { status } = req.body; // Expecting { "status": "Ready" }
+        
+        const order = await Order.findOneAndUpdate(
+            { _id: req.params.id, pharmacyId: req.user.id }, // Ensure ownership
+            { status },
+            { new: true }
+        );
+
+        if (!order) return res.status(404).json({ message: "Order not found" });
+
+        res.json(order);
+    } catch (err) {
+        res.status(400).json({ message: err.message });
     }
 };

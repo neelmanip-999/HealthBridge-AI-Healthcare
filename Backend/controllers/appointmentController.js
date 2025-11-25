@@ -117,3 +117,35 @@ exports.cancelAppointment = async (req, res) => {
         res.status(500).json({ message: 'Server Error' });
     }
 };
+
+// 6. COMPLETE APPOINTMENT (New Functionality)
+exports.completeAppointment = async (req, res) => {
+    try {
+        const { appointmentId, diagnosis, prescription } = req.body;
+
+        // Find the appointment and update it
+        const appointment = await Appointment.findByIdAndUpdate(
+            appointmentId,
+            { 
+                status: 'completed',
+                diagnosis: diagnosis,       // Save Diagnosis
+                prescription: prescription  // Save Prescription
+            },
+            { new: true } // Return the updated document
+        );
+
+        if (!appointment) {
+            return res.status(404).json({ message: 'Appointment not found' });
+        }
+
+        res.status(200).json({ 
+            success: true, 
+            message: 'Consultation completed successfully', 
+            data: appointment 
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Error completing appointment', error: error.message });
+    }
+};

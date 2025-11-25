@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { 
     Stethoscope, 
     LogOut, 
@@ -8,9 +9,13 @@ import {
     Calendar, 
     Clock, 
     User,
-    Bell
+    Bell,
+    FileText,      // New
+    CheckCircle,   // New
+    Activity,      // New
+    X              // New
 } from 'lucide-react';
-import api, { getDoctorAppointments } from '../services/api'; // Import new API function
+import api, { getDoctorAppointments } from '../services/api'; 
 import ChatWindow from '../components/ChatWindow';
 import { useSocket } from '../context/SocketContext';
 
@@ -21,22 +26,26 @@ const DoctorDashboard = () => {
     const [appointments, setAppointments] = useState([]);
     const [statusError, setStatusError] = useState('');
     const [chatSession, setChatSession] = useState(null);
-    const [notification, setNotification] = useState(null); // State for new booking alerts
+    const [notification, setNotification] = useState(null); 
+
+    // --- NEW STATE FOR COMPLETION MODAL ---
+    const [showModal, setShowModal] = useState(false);
+    const [selectedAppointment, setSelectedAppointment] = useState(null);
+    const [consultationData, setConsultationData] = useState({
+        diagnosis: '',
+        prescription: ''
+    });
 
     // 1. Initial Data Fetch & Socket Setup
     useEffect(() => {
         fetchAppointments();
 
         if (socket && doctor._id) {
-            // CRITICAL: Join a specific room for this doctor so backend can target notifications
             socket.emit('join_room', doctor._id);
 
-            // Listen for new booking notifications
             socket.on('appointment_notification', (data) => {
-                setNotification(data.message); // Show alert
-                fetchAppointments(); // Refresh list immediately
-                
-                // Hide alert after 5 seconds
+                setNotification(data.message); 
+                fetchAppointments(); 
                 setTimeout(() => setNotification(null), 5000);
             });
         }
@@ -68,7 +77,6 @@ const DoctorDashboard = () => {
     };
 
     const handleStartChatFromAppointment = (appointment) => {
-        // Set the chat session with the patient details from the appointment
         setChatSession({ 
             partner: appointment.patientId, 
             sessionId: `${appointment.patientId._id}-${doctor._id}` 
@@ -87,7 +95,35 @@ const DoctorDashboard = () => {
         navigate('/');
     };
 
-    // Helper: Format Date
+    // --- NEW FUNCTIONS FOR COMPLETION ---
+    const openCompleteModal = (apt) => {
+        setSelectedAppointment(apt);
+        setConsultationData({ diagnosis: '', prescription: '' });
+        setShowModal(true);
+    };
+
+    const handleCompleteAppointment = async (e) => {
+        e.preventDefault();
+        const token = localStorage.getItem('token'); // Ensure we have token for direct call
+        try {
+            await axios.post('http://localhost:5000/api/appointments/complete', {
+                appointmentId: selectedAppointment._id,
+                diagnosis: consultationData.diagnosis,
+                prescription: consultationData.prescription
+            }, {
+                headers: { 'auth-token': token }
+            });
+
+            // Close modal and refresh
+            setShowModal(false);
+            fetchAppointments();
+            alert('Consultation Saved Successfully!');
+        } catch (err) {
+            console.error("Error completing appointment", err);
+            alert("Failed to save details. Please try again.");
+        }
+    };
+
     const formatDate = (dateString) => {
         const options = { year: 'numeric', month: 'long', day: 'numeric' };
         return new Date(dateString).toLocaleDateString(undefined, options);
@@ -107,6 +143,7 @@ const DoctorDashboard = () => {
                 </div>
             )}
 
+            {/* Header */}
             <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center bg-white/80 backdrop-blur-sm p-8 shadow-2xl rounded-3xl mb-10 border-t-4 border-indigo-600 relative z-10">
                 <div className="flex items-center space-x-4 mb-4 lg:mb-0">
                     <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-100 rounded-2xl">
@@ -187,9 +224,9 @@ const DoctorDashboard = () => {
                             ) : (
                                 <div className="space-y-4 overflow-y-auto pr-2 custom-scrollbar">
                                     {appointments.map((apt) => (
-                                        <div key={apt._id} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-all flex flex-col md:flex-row justify-between items-center gap-4">
+                                        <div key={apt._id} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-all flex flex-col lg:flex-row justify-between items-center gap-4">
                                             
-                                            <div className="flex items-center gap-4 w-full md:w-auto">
+                                            <div className="flex items-center gap-4 w-full lg:w-auto">
                                                 <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold text-xl">
                                                     {apt.patientId.name[0]}
                                                 </div>
@@ -202,19 +239,35 @@ const DoctorDashboard = () => {
                                                 </div>
                                             </div>
 
-                                            <div className="flex items-center gap-3 w-full md:w-auto">
+                                            <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-end">
+                                                {/* Payment Status Badge */}
                                                 <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${
                                                     apt.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                                                 }`}>
                                                     {apt.paymentStatus}
                                                 </span>
                                                 
-                                                <button 
-                                                    onClick={() => handleStartChatFromAppointment(apt)}
-                                                    className="flex-1 md:flex-none px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold transition shadow-lg shadow-indigo-200"
-                                                >
-                                                    Join Consultation
-                                                </button>
+                                                {/* Action Buttons */}
+                                                {apt.status === 'completed' ? (
+                                                    <span className="flex items-center gap-2 px-4 py-2 bg-green-50 text-green-700 rounded-xl font-bold border border-green-200">
+                                                        <CheckCircle className="w-4 h-4" /> Completed
+                                                    </span>
+                                                ) : (
+                                                    <>
+                                                        <button 
+                                                            onClick={() => handleStartChatFromAppointment(apt)}
+                                                            className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl font-semibold transition"
+                                                        >
+                                                            Chat
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => openCompleteModal(apt)}
+                                                            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold transition shadow-lg shadow-indigo-200 flex items-center gap-2"
+                                                        >
+                                                            <FileText className="w-4 h-4" /> Complete
+                                                        </button>
+                                                    </>
+                                                )}
                                             </div>
                                         </div>
                                     ))}
@@ -224,6 +277,58 @@ const DoctorDashboard = () => {
                     )}
                 </div>
             </main>
+
+            {/* --- COMPLETION MODAL --- */}
+            {showModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-8 relative animate-in fade-in zoom-in duration-200">
+                        <button 
+                            onClick={() => setShowModal(false)}
+                            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 bg-gray-100 p-1 rounded-full"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+
+                        <h2 className="text-2xl font-bold mb-6 text-gray-800 flex items-center gap-2">
+                            <Activity className="w-6 h-6 text-indigo-600" />
+                            Consultation Details
+                        </h2>
+                        
+                        <form onSubmit={handleCompleteAppointment} className="space-y-6">
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-2">Diagnosis</label>
+                                <input 
+                                    type="text" 
+                                    required
+                                    placeholder="e.g. Viral Fever, Hypertension"
+                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition"
+                                    value={consultationData.diagnosis}
+                                    onChange={(e) => setConsultationData({...consultationData, diagnosis: e.target.value})}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-2">Prescription & Notes</label>
+                                <textarea 
+                                    required
+                                    rows="5"
+                                    placeholder="1. Paracetamol 500mg - After food&#10;2. Drink plenty of warm water&#10;3. Rest for 3 days"
+                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition resize-none"
+                                    value={consultationData.prescription}
+                                    onChange={(e) => setConsultationData({...consultationData, prescription: e.target.value})}
+                                />
+                            </div>
+
+                            <button 
+                                type="submit" 
+                                className="w-full bg-indigo-600 text-white py-3 rounded-lg font-bold text-lg hover:bg-indigo-700 transition flex items-center justify-center gap-2 shadow-lg shadow-indigo-200"
+                            >
+                                <CheckCircle className="w-5 h-5" /> Save & Complete
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

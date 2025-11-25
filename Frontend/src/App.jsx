@@ -1,8 +1,8 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { SocketProvider } from './context/SocketContext'; // <-- IMPORT
+import { SocketProvider } from './context/SocketContext';
 
-// Import all your pages...
+// --- EXISTING PAGES ---
 import HomePage from './pages/HomePage';
 import DoctorLogin from './pages/DoctorLogin';
 import DoctorRegister from './pages/DoctorRegister';
@@ -19,7 +19,11 @@ import PharmacyLogin from './pages/PharmacyLogin';
 import PharmacyRegister from './pages/PharmacyRegister';
 import PharmacyDashboard from './pages/PharmacyDashboard';
 
-// Your ProtectedRoute remains unchanged
+// --- NEW PAGES (Added) ---
+import MedicalHistory from './pages/MedicalHistory';
+import PharmacyCatalog from './pages/PharmacyCatalog';
+
+
 const ProtectedRoute = ({ children, role }) => {
     const token = localStorage.getItem('token');
     const user = JSON.parse(localStorage.getItem('user'));
@@ -34,55 +38,33 @@ const ProtectedRoute = ({ children, role }) => {
 const App = () => {
     return (
         <Router>
-            {/* --- THE FIX IS HERE: PROVIDER IS NOW INSIDE ROUTER --- */}
             <SocketProvider>
                 <Routes>
-                    {/* All your existing routes go here */}
                     <Route path="/" element={<HomePage />} />
                     
                     {/* Doctor Routes */}
                     <Route path="/doctor/login" element={<DoctorLogin />} />
                     <Route path="/doctor/register" element={<DoctorRegister />} />
-                    <Route 
-                        path="/doctor/dashboard" 
-                        element={<ProtectedRoute role="doctor"><DoctorDashboard /></ProtectedRoute>} 
-                    />
+                    <Route path="/doctor/dashboard" element={<ProtectedRoute role="doctor"><DoctorDashboard /></ProtectedRoute>} />
                     
                     {/* Patient Routes */}
                     <Route path="/patient/login" element={<PatientLogin />} />
                     <Route path="/patient/register" element={<PatientRegister />} />
-                    <Route 
-                        path="/patient/dashboard" 
-                        element={<ProtectedRoute role="patient"><PatientDashboard /></ProtectedRoute>} 
-                    />
-                    <Route 
-                        path="/patient/doctors" 
-                        element={<ProtectedRoute role="patient"><FindDoctors /></ProtectedRoute>} 
-                    />
-                    <Route 
-                        path="/patient/ai-assistant" 
-                        element={<ProtectedRoute role="patient"><AIHealthAssistant /></ProtectedRoute>} 
-                    />
-                    <Route 
-                        path="/patient/report-analysis" 
-                        element={<ProtectedRoute role="patient"><ReportAnalysis /></ProtectedRoute>} 
-                    />
-                    <Route 
-                        path="/patient/map" 
-                        element={<ProtectedRoute role="patient"><MapPage /></ProtectedRoute>} 
-                    />
-                    <Route 
-                        path="/patient/chat/:doctorId" 
-                        element={<ProtectedRoute role="patient"><Chat /></ProtectedRoute>} 
-                    />
+                    <Route path="/patient/dashboard" element={<ProtectedRoute role="patient"><PatientDashboard /></ProtectedRoute>} />
+                    <Route path="/patient/doctors" element={<ProtectedRoute role="patient"><FindDoctors /></ProtectedRoute>} />
+                    <Route path="/patient/ai-assistant" element={<ProtectedRoute role="patient"><AIHealthAssistant /></ProtectedRoute>} />
+                    <Route path="/patient/report-analysis" element={<ProtectedRoute role="patient"><ReportAnalysis /></ProtectedRoute>} />
+                    <Route path="/patient/map" element={<ProtectedRoute role="patient"><MapPage /></ProtectedRoute>} />
+                    <Route path="/patient/chat/:doctorId" element={<ProtectedRoute role="patient"><Chat /></ProtectedRoute>} />
+                    
+                    {/* --- NEW ROUTES FOR MEDICAL HISTORY & PHARMACY CATALOG --- */}
+                    <Route path="/patient/medical-history" element={<ProtectedRoute role="patient"><MedicalHistory /></ProtectedRoute>} />
+                    <Route path="/patient/pharmacy-catalog" element={<ProtectedRoute role="patient"><PharmacyCatalog /></ProtectedRoute>} />
                     
                     {/* Pharmacy Routes */}
                     <Route path="/pharmacy/login" element={<PharmacyLogin />} />
                     <Route path="/pharmacy/register" element={<PharmacyRegister />} />
-                    <Route 
-                        path="/pharmacy/dashboard" 
-                        element={<ProtectedRoute role="pharmacy"><PharmacyDashboard /></ProtectedRoute>} 
-                    />
+                    <Route path="/pharmacy/dashboard" element={<ProtectedRoute role="pharmacy"><PharmacyDashboard /></ProtectedRoute>} />
 
                     <Route path="*" element={<h1 className='text-4xl text-center pt-20 font-bold text-red-500'>404 | Page Not Found</h1>} />
                 </Routes>
@@ -92,4 +74,3 @@ const App = () => {
 };
 
 export default App;
-

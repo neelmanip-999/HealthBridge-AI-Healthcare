@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, MapPin, Navigation, Save, Trash2, Search, Hospital } from 'lucide-react';
 import axios from 'axios';
-import { GoogleMap, LoadScript, Marker, DirectionsRenderer, Autocomplete } from '@react-google-maps/api';
+import { GoogleMap, LoadScript, Marker, DirectionsRenderer, Autocomplete, InfoWindow } from '@react-google-maps/api';
 
 const GOOGLE_MAPS_API_KEY = "AIzaSyD7Vw4BlccSY7Y677v599yhYC7heGWi65s";
 const LIBRARIES = ["places"];  // Define libraries as a constant outside component
@@ -19,6 +19,7 @@ const MapPage = () => {
     const [showHospitals, setShowHospitals] = useState(true);
     const [loading, setLoading] = useState(false);
     const [mapRef, setMapRef] = useState(null);
+    const [selectedHospital, setSelectedHospital] = useState(null);
     const autocompleteRef = useRef(null);
 
     const STORAGE_KEY = "my_saved_locations_v1";
@@ -158,6 +159,16 @@ const MapPage = () => {
         findRouteUsingCoords(coords);
     };
 
+    // Handle hospital marker click
+    const handleHospitalClick = async (hospital) => {
+        setSelectedHospital(hospital);
+        const destCoords = {
+            lat: hospital.location.coordinates[1],
+            lng: hospital.location.coordinates[0]
+        };
+        await findRouteUsingCoords(destCoords);
+    };
+
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 relative">
             {/* Google Map Container */}
@@ -191,6 +202,7 @@ const MapPage = () => {
                                 lng: hospital.location.coordinates[0],
                             }}
                             title={hospital.name}
+                            onClick={() => handleHospitalClick(hospital)}
                             icon={{
                                 url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(
                                     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32"><circle cx="16" cy="16" r="14" fill="%23ef4444" stroke="%23ffffff" stroke-width="2"/><text x="16" y="20" font-size="16" text-anchor="middle" fill="white" dominant-baseline="middle">🏥</text></svg>'
@@ -217,6 +229,39 @@ const MapPage = () => {
                             }}
                         />
                     ))}
+
+                    {/* Hospital Info Window */}
+                    {selectedHospital && (
+                        <InfoWindow
+                            position={{
+                                lat: selectedHospital.location.coordinates[1],
+                                lng: selectedHospital.location.coordinates[0],
+                            }}
+                            onCloseClick={() => setSelectedHospital(null)}
+                        >
+                            <div className="bg-white p-4 rounded-lg shadow-lg max-w-xs">
+                                <h3 className="text-lg font-bold text-gray-800 mb-2">{selectedHospital.name}</h3>
+                                {selectedHospital.address && (
+                                    <p className="text-sm text-gray-600 mb-1">
+                                        <span className="font-semibold">Address:</span> {selectedHospital.address}
+                                    </p>
+                                )}
+                                {selectedHospital.phone && (
+                                    <p className="text-sm text-gray-600 mb-1">
+                                        <span className="font-semibold">Phone:</span> {selectedHospital.phone}
+                                    </p>
+                                )}
+                                {selectedHospital.specialties && selectedHospital.specialties.length > 0 && (
+                                    <p className="text-sm text-gray-600 mb-2">
+                                        <span className="font-semibold">Specialties:</span> {selectedHospital.specialties.join(', ')}
+                                    </p>
+                                )}
+                                <p className="text-sm text-blue-600 font-semibold">
+                                    Check route info in the sidebar →
+                                </p>
+                            </div>
+                        </InfoWindow>
+                    )}
 
                     {/* Directions */}
                     {directions && <DirectionsRenderer directions={directions} />}

@@ -31,10 +31,12 @@ const AIHealthAssistant = () => {
 
         try {
             const token = localStorage.getItem('token');
+            const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            const apiBaseURL = isLocalhost ? 'http://localhost:5000/api' : `http://${window.location.hostname}:5000/api`;
             
-            // Corrected API endpoint and request body
-            const response = await axios.post('/api/ai/ask', 
-                { prompt: userMessage.content }, // Sending 'prompt' to match backend
+            // Make API call with full URL
+            const response = await axios.post(`${apiBaseURL}/ai/ask`, 
+                { prompt: userMessage.content },
                 { headers: { 'auth-token': token } }
             );
             

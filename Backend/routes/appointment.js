@@ -23,20 +23,13 @@ router.get('/doctor', auth, appointmentController.getDoctorAppointments);
 // @access  Private (Patient only)
 router.get('/patient', auth, appointmentController.getPatientAppointments);
 
-// --- NEW ROUTE FOR CHECKING AVAILABILITY ---
-// @route   GET /api/appointments/booked-slots
-// @desc    Get booked time slots for a specific doctor and date
-// @access  Private
-router.get('/booked-slots', auth, appointmentController.getBookedSlots);
-// -------------------------------------------
-
 // @route   DELETE /api/appointments/:id
-// @desc    Cancel an appointment (Patient OR Doctor)
+// @desc    Cancel an appointment
 // @access  Private
 router.delete('/:id', auth, appointmentController.cancelAppointment);
 
 // @route   POST /api/appointments/complete
-// @desc    Mark appointment as completed and save diagnosis/prescription
+// @desc    Mark appointment as completed and save diagnosis/prescription (NEW)
 // @access  Private (Doctor only)
 router.post('/complete', auth, appointmentController.completeAppointment);
 

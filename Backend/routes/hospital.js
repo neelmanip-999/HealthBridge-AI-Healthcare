@@ -35,8 +35,8 @@ router.get('/all', async (req, res) => {
         // Fetch hospitals added by doctors
         const doctorAddedHospitals = await Hospital.find();
 
-        // Fetch hospital accounts registered via registration
-        const hospitalAccounts = await HospitalAccount.find().select('name email phone address location');
+        // Fetch hospital accounts registered via registration (with pricing)
+        const hospitalAccounts = await HospitalAccount.find().select('name email phone address location specialties beds emergencyServices pricing');
 
         // Format hospital accounts to match the Hospital model structure
         const formattedAccounts = hospitalAccounts.map(hospital => ({
@@ -46,6 +46,10 @@ router.get('/all', async (req, res) => {
             email: hospital.email,
             phone: hospital.phone,
             address: hospital.address,
+            specialties: hospital.specialties,
+            beds: hospital.beds,
+            emergencyServices: hospital.emergencyServices,
+            pricing: hospital.pricing || [],
             type: 'hospital_account'
         }));
 

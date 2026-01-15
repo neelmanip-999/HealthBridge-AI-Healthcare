@@ -67,7 +67,36 @@ router.post('/upload', (req, res) => {
     });
 });
 
-// --- 3. EXISTING CHAT HISTORY ROUTE ---
+// --- 3. SAVE MESSAGE ROUTE (NEW) ---
+// @route   POST /api/chat/send
+// @desc    Save a chat message to the database
+router.post('/send', async (req, res) => {
+    try {
+        const { senderId, receiverId, message, senderRole, attachmentUrl, attachmentType, timestamp } = req.body;
+
+        if (!senderId || !receiverId) {
+            return res.status(400).json({ message: 'Sender and receiver IDs are required' });
+        }
+
+        const newMessage = new Chat({
+            senderId,
+            receiverId,
+            message,
+            senderRole,
+            attachmentUrl: attachmentUrl || null,
+            attachmentType: attachmentType || 'none',
+            timestamp: timestamp || new Date()
+        });
+
+        await newMessage.save();
+        res.json(newMessage);
+    } catch (error) {
+        console.error('Error saving message:', error);
+        res.status(500).json({ message: 'Server error saving message' });
+    }
+});
+
+// --- 4. EXISTING CHAT HISTORY ROUTE ---
 // @route   GET /api/chat/history/:user1Id/:user2Id
 // @desc    Get chat history between two users
 router.get('/history/:user1Id/:user2Id', async (req, res) => {

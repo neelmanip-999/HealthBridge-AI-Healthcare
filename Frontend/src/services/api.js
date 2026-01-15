@@ -1,7 +1,11 @@
 import axios from 'axios';
 
+// Detect if running on localhost or network
+const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const apiBaseURL = isLocalhost ? 'http://localhost:5000/api' : `http://${window.location.hostname}:5000/api`;
+
 const api = axios.create({
-  baseURL: 'http://localhost:5000/api', // Must match your backend port
+  baseURL: apiBaseURL, // Dynamically set based on access method
   headers: {
     'Content-Type': 'application/json',
   },

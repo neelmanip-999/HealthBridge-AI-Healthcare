@@ -1,0 +1,13 @@
+<svg width="260" height="60" viewBox="0 0 260 60" xmlns="http://www.w3.org/2000/svg">
+  <!-- Dots -->
+  <circle cx="85" cy="12" r="5" fill="#6BCF63"></circle>
+  <circle cx="105" cy="6" r="4" fill="#6BCF63"></circle>
+  <circle cx="125" cy="12" r="5" fill="#6BCF63"></circle>
+  <circle cx="145" cy="6" r="4" fill="#6BCF63"></circle>
+  <circle cx="165" cy="12" r="5" fill="#6BCF63"></circle>
+
+  <!-- Text -->
+  <text x="10" y="45" font-size="36" font-weight="600" fill="#2F5F7A" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif">
+    Health<tspan fill="#2F5F7A">Bridge</tspan>
+  </text>
+</svg>

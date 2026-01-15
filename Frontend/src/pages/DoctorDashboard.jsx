@@ -4,17 +4,16 @@ import axios from 'axios';
 import { 
     Stethoscope, LogOut, MessageSquare, Briefcase, Calendar, Clock, 
     User, Bell, FileText, CheckCircle, Activity, X, TrendingUp, 
-    Users, DollarSign, ChevronRight, ChevronLeft, MapPin, Edit3, Save, Loader2, 
-    Download, Trash2 // <--- Added Trash2 Icon
+    Users, DollarSign, ChevronRight, ChevronLeft, MapPin, Edit3, Save, Loader2 
 } from 'lucide-react';
 import api, { getDoctorAppointments } from '../services/api'; 
 import ChatWindow from '../components/ChatWindow';
 import { useSocket } from '../context/SocketContext';
-// import { generateChatPDF } from '../utils/chatPdfGenerator'; 
 
 const DoctorDashboard = () => {
     const navigate = useNavigate();
     const { socket, isConnected } = useSocket();
+    // Load doctor from local storage, but prefer state for live updates
     const [doctor, setDoctor] = useState(() => JSON.parse(localStorage.getItem('user')) || {});
     
     // Data State
@@ -29,12 +28,12 @@ const DoctorDashboard = () => {
 
     // Modals State
     const [showCompleteModal, setShowCompleteModal] = useState(false);
-    const [showProfileModal, setShowProfileModal] = useState(false);
+    const [showProfileModal, setShowProfileModal] = useState(false); // --- NEW: Profile Modal
     const [selectedAppointment, setSelectedAppointment] = useState(null);
     
     // Form Data
     const [consultationData, setConsultationData] = useState({ diagnosis: '', prescription: '' });
-    const [profileData, setProfileData] = useState({ ...doctor });
+    const [profileData, setProfileData] = useState({ ...doctor }); // --- NEW: Profile Form Data
 
     // --- 1. INITIAL FETCH & SOCKETS ---
     useEffect(() => {
@@ -59,10 +58,16 @@ const DoctorDashboard = () => {
         }
     };
 
-    // --- 2. STATISTICS ENGINE 📊 ---
+    // --- 2. STATISTICS ENGINE (FIXED & ROBUST) 📊 ---
     const stats = useMemo(() => {
+        // Filter only completed appointments
         const completed = appointments.filter(a => a.status === 'completed');
+        
+        // Count unique patients
         const uniquePatients = new Set(completed.map(a => a.patientId?._id)).size;
+        
+        // Calculate Earnings: Use the appointment price if available, else doctor's current fee
+        // This ensures historical accuracy if fees change later
         const totalEarnings = completed.reduce((sum, appt) => {
             const fee = appt.price || parseInt(doctor.fees) || 0; 
             return sum + fee;
@@ -76,14 +81,18 @@ const DoctorDashboard = () => {
         };
     }, [appointments, doctor.fees]);
 
-    // --- 3. FILTERING LOGIC ---
+    // --- 3. FILTERING LOGIC (Calendar + Tabs) ---
     const filteredAppointments = useMemo(() => {
         let filtered = appointments;
+
+        // Tab Filter
         if (activeTab === 'upcoming') {
             filtered = filtered.filter(a => a.status !== 'completed' && a.status !== 'cancelled');
         } else {
             filtered = filtered.filter(a => a.status === 'completed' || a.status === 'cancelled');
         }
+
+        // Calendar Date Filter
         if (selectedDate) {
             filtered = filtered.filter(a => {
                 const apptDate = new Date(a.date).toDateString();
@@ -91,6 +100,8 @@ const DoctorDashboard = () => {
                 return apptDate === filterDate;
             });
         }
+
+        // Sort by Date/Time
         return filtered.sort((a, b) => new Date(a.date) - new Date(b.date));
     }, [appointments, activeTab, selectedDate]);
 
@@ -104,6 +115,7 @@ const DoctorDashboard = () => {
         const month = currentMonth.getMonth();
         const days = new Date(year, month + 1, 0).getDate();
         const firstDay = new Date(year, month, 1).getDay();
+        
         const grid = [];
         for (let i = 0; i < firstDay; i++) grid.push(null);
         for (let i = 1; i <= days; i++) grid.push(new Date(year, month, i));
@@ -140,35 +152,6 @@ const DoctorDashboard = () => {
         });
     };
 
-    // --- NEW: Download PDF Handler ---
-    const handleDownloadChat = async (apt) => {
-        try {
-            const res = await api.get(`/chat/history/${doctor._id}/${apt.patientId._id}`);
-            const messages = res.data;
-            if (!messages || messages.length === 0) {
-                alert("No chat conversation found.");
-                return;
-            }
-            generateChatPDF(messages, doctor.name, apt.patientId.name, apt.date);
-        } catch (err) {
-            console.error("Error downloading chat:", err);
-            alert("Failed to download chat transcript.");
-        }
-    };
-
-    // --- NEW: Cancel Appointment Handler ---
-    const handleCancel = async (id) => {
-        if (!window.confirm("Are you sure you want to cancel this appointment? This cannot be undone.")) return;
-        try {
-            await api.delete(`/appointments/${id}`);
-            setAppointments(prev => prev.filter(a => a._id !== id));
-            alert("Appointment cancelled successfully.");
-        } catch (err) {
-            console.error(err);
-            alert("Failed to cancel appointment.");
-        }
-    };
-
     const handleComplete = async (e) => {
         e.preventDefault();
         try {
@@ -178,6 +161,8 @@ const DoctorDashboard = () => {
                 ...consultationData
             }, { headers: { 'auth-token': token } });
             
+            // --- OPTIMISTIC UPDATE (Fix for "Earnings won't update") ---
+            // Manually update the local state immediately so the UI reflects changes instantly
             setAppointments(prev => prev.map(a => 
                 a._id === selectedAppointment._id ? { ...a, status: 'completed' } : a
             ));
@@ -190,6 +175,8 @@ const DoctorDashboard = () => {
     const handleProfileUpdate = async (e) => {
         e.preventDefault();
         try {
+            // In a real app, you would send this to the backend: await api.put('/doctor/profile', profileData);
+            // For now, we update local state/storage to simulate it
             setDoctor(profileData);
             localStorage.setItem('user', JSON.stringify(profileData));
             setShowProfileModal(false);
@@ -209,7 +196,7 @@ const DoctorDashboard = () => {
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col">
             
-            {/* HEADER */}
+            {/* --- TOP NAVIGATION --- */}
             <header className="bg-white border-b border-gray-200 sticky top-0 z-30 px-6 py-4 flex justify-between items-center shadow-sm">
                 <div className="flex items-center gap-3">
                     <div className="bg-indigo-600 p-2 rounded-lg text-white"><Stethoscope className="w-6 h-6" /></div>
@@ -223,7 +210,6 @@ const DoctorDashboard = () => {
                 </div>
 
                 <div className="flex items-center gap-4">
-                    {notification && <div className="bg-indigo-600 text-white px-4 py-2 rounded-full text-sm animate-bounce"><Bell className="w-4 h-4 inline mr-2"/>{notification}</div>}
                     <div className="bg-gray-100 p-1 rounded-lg flex text-sm font-medium">
                         <button onClick={() => handleUpdateStatus('free')} className={`px-3 py-1.5 rounded-md transition ${doctor.status === 'free' ? 'bg-white text-green-700 shadow-sm' : 'text-gray-500'}`}>Online</button>
                         <button onClick={() => handleUpdateStatus('busy')} className={`px-3 py-1.5 rounded-md transition ${doctor.status === 'busy' ? 'bg-white text-yellow-700 shadow-sm' : 'text-gray-500'}`}>Busy</button>
@@ -234,16 +220,22 @@ const DoctorDashboard = () => {
 
             <div className="flex flex-1 overflow-hidden">
                 
-                {/* SIDEBAR */}
+                {/* --- LEFT SIDEBAR (Organizer) --- */}
                 <aside className="w-80 bg-white border-r border-gray-200 hidden lg:flex flex-col overflow-y-auto p-6 gap-8">
-                    {/* Profile Card */}
+                    
+                    {/* PROFILE CARD (Improved) */}
                     <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden group">
                         <div className="absolute top-0 right-0 p-3 opacity-0 group-hover:opacity-100 transition">
                             <button onClick={() => { setProfileData(doctor); setShowProfileModal(true); }} className="bg-white/20 hover:bg-white/30 p-2 rounded-full backdrop-blur-sm"><Edit3 className="w-4 h-4 text-white" /></button>
                         </div>
                         <div className="flex items-center gap-4 mb-4">
-                            <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-2xl font-bold border-2 border-white/30">{doctor.name?.[0]}</div>
-                            <div><h3 className="font-bold text-lg leading-tight">Dr. {doctor.name}</h3><p className="text-indigo-100 text-sm">{doctor.specialization}</p></div>
+                            <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-2xl font-bold border-2 border-white/30">
+                                {doctor.name?.[0]}
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-lg leading-tight">Dr. {doctor.name}</h3>
+                                <p className="text-indigo-100 text-sm">{doctor.specialization}</p>
+                            </div>
                         </div>
                         <div className="space-y-2 text-sm text-indigo-100">
                             <div className="flex items-center gap-2"><Briefcase className="w-4 h-4 opacity-70"/> {doctor.experience || '5+ Years'} Exp.</div>
@@ -251,13 +243,39 @@ const DoctorDashboard = () => {
                         </div>
                     </div>
 
-                    {/* Stats */}
+                    {/* UP NEXT WIDGET */}
+                    {upNext ? (
+                        <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-5 shadow-sm relative overflow-hidden">
+                            <div className="absolute top-0 right-0 bg-indigo-200 text-indigo-800 text-[10px] font-bold px-2 py-1 rounded-bl-lg">UP NEXT</div>
+                            <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-2">Next Patient</h3>
+                            <div className="flex items-center gap-3 mb-3">
+                                <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-indigo-700 font-bold shadow-sm">{upNext.patientId.name[0]}</div>
+                                <div>
+                                    <p className="font-bold text-gray-800">{upNext.patientId.name}</p>
+                                    <p className="text-xs text-gray-500">{upNext.timeSlot}</p>
+                                </div>
+                            </div>
+                            <button onClick={() => handleStartChat(upNext)} className="w-full bg-indigo-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700 transition shadow-md">Start Consultation</button>
+                        </div>
+                    ) : (
+                        <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5 text-center">
+                            <p className="text-sm text-gray-500 font-medium">No upcoming patients today.</p>
+                        </div>
+                    )}
+
+                    {/* STATS CARDS */}
                     <div className="grid grid-cols-2 gap-3">
-                        <div className="bg-green-50 p-4 rounded-2xl border border-green-100"><p className="text-xs text-green-600 font-medium mb-1">Total Earnings</p><p className="text-xl font-bold text-green-800 flex items-center"><DollarSign className="w-4 h-4"/>{stats.earnings}</p></div>
-                        <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100"><p className="text-xs text-blue-600 font-medium mb-1">Total Patients</p><p className="text-xl font-bold text-blue-800 flex items-center"><Users className="w-4 h-4 mr-1"/>{stats.patients}</p></div>
+                        <div className="bg-green-50 p-4 rounded-2xl border border-green-100">
+                            <p className="text-xs text-green-600 font-medium mb-1">Total Earnings</p>
+                            <p className="text-xl font-bold text-green-800 flex items-center"><DollarSign className="w-4 h-4"/>{stats.earnings}</p>
+                        </div>
+                        <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100">
+                            <p className="text-xs text-blue-600 font-medium mb-1">Total Patients</p>
+                            <p className="text-xl font-bold text-blue-800 flex items-center"><Users className="w-4 h-4 mr-1"/>{stats.patients}</p>
+                        </div>
                     </div>
 
-                    {/* Calendar */}
+                    {/* MINI CALENDAR */}
                     <div>
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="font-bold text-gray-800">{currentMonth.toLocaleString('default', { month: 'long', year: 'numeric' })}</h3>
@@ -273,10 +291,14 @@ const DoctorDashboard = () => {
                                     <button 
                                         key={i} 
                                         onClick={() => setSelectedDate(date.toDateString() === selectedDate?.toDateString() ? null : date)}
-                                        className={`h-8 w-8 rounded-full flex flex-col items-center justify-center transition relative ${selectedDate && date.toDateString() === selectedDate.toDateString() ? 'bg-indigo-600 text-white shadow-md' : 'hover:bg-gray-100 text-gray-700'}`}
+                                        className={`h-8 w-8 rounded-full flex flex-col items-center justify-center transition relative ${
+                                            selectedDate && date.toDateString() === selectedDate.toDateString() ? 'bg-indigo-600 text-white shadow-md' : 'hover:bg-gray-100 text-gray-700'
+                                        }`}
                                     >
                                         <span>{date.getDate()}</span>
-                                        {hasAppointmentOnDate(date) && <span className={`w-1 h-1 rounded-full absolute bottom-1 ${selectedDate && date.toDateString() === selectedDate.toDateString() ? 'bg-white' : 'bg-red-500'}`}></span>}
+                                        {hasAppointmentOnDate(date) && (
+                                            <span className={`w-1 h-1 rounded-full absolute bottom-1 ${selectedDate && date.toDateString() === selectedDate.toDateString() ? 'bg-white' : 'bg-red-500'}`}></span>
+                                        )}
                                     </button>
                                 ) : <span key={i}></span>
                             ))}
@@ -285,7 +307,7 @@ const DoctorDashboard = () => {
                     </div>
                 </aside>
 
-                {/* MAIN AREA */}
+                {/* --- MAIN CONTENT AREA --- */}
                 <main className="flex-1 bg-gray-50 p-4 md:p-8 overflow-y-auto">
                     {chatSession ? (
                         <div className="h-full max-w-4xl mx-auto">
@@ -293,6 +315,7 @@ const DoctorDashboard = () => {
                         </div>
                     ) : (
                         <div className="max-w-5xl mx-auto">
+                            {/* Tabs */}
                             <div className="flex gap-6 border-b border-gray-200 mb-6">
                                 <button onClick={() => setActiveTab('upcoming')} className={`pb-3 font-semibold text-sm transition ${activeTab === 'upcoming' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}>
                                     Upcoming Appointments <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full text-xs ml-1">{stats.pendingCount}</span>
@@ -302,6 +325,7 @@ const DoctorDashboard = () => {
                                 </button>
                             </div>
 
+                            {/* Patient List */}
                             <div className="space-y-4">
                                 {filteredAppointments.length === 0 ? (
                                     <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-gray-300">
@@ -328,34 +352,13 @@ const DoctorDashboard = () => {
                                                     </div>
                                                 </div>
                                             </div>
-                                            
                                             <div className="flex items-center gap-3 w-full md:w-auto justify-end">
                                                 {apt.status === 'completed' ? (
-                                                    <div className="flex gap-2">
-                                                        <span className="flex items-center gap-2 px-4 py-2 bg-gray-50 text-gray-600 rounded-lg text-sm font-semibold border border-gray-100"><CheckCircle className="w-4 h-4 text-green-500" /> Completed</span>
-                                                        {/* ARCHIVE BUTTON */}
-                                                        <button 
-                                                            onClick={() => handleDownloadChat(apt)}
-                                                            className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition shadow-sm border border-indigo-100"
-                                                            title="Download Chat Archive"
-                                                        >
-                                                            <Download className="w-5 h-5" />
-                                                        </button>
-                                                    </div>
+                                                    <span className="flex items-center gap-2 px-4 py-2 bg-gray-50 text-gray-600 rounded-lg text-sm font-semibold"><CheckCircle className="w-4 h-4 text-green-500" /> Completed</span>
                                                 ) : (
                                                     <>
                                                         <button onClick={() => handleStartChat(apt)} className="flex-1 md:flex-none px-5 py-2.5 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition shadow-md shadow-indigo-100">Chat Now</button>
-                                                        
                                                         <button onClick={() => { setSelectedAppointment(apt); setConsultationData({diagnosis: '', prescription: ''}); setShowCompleteModal(true); }} className="flex-1 md:flex-none px-5 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition">Mark Complete</button>
-                                                        
-                                                        {/* --- CANCEL BUTTON --- */}
-                                                        <button 
-                                                            onClick={() => handleCancel(apt._id)} 
-                                                            className="p-2.5 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition border border-transparent hover:border-red-200"
-                                                            title="Cancel Appointment"
-                                                        >
-                                                            <Trash2 className="w-5 h-5" />
-                                                        </button>
                                                     </>
                                                 )}
                                             </div>
@@ -368,7 +371,7 @@ const DoctorDashboard = () => {
                 </main>
             </div>
 
-            {/* COMPLETION MODAL */}
+            {/* --- 1. COMPLETION MODAL --- */}
             {showCompleteModal && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-8 animate-in zoom-in duration-200">
@@ -385,7 +388,7 @@ const DoctorDashboard = () => {
                 </div>
             )}
 
-            {/* PROFILE MODAL */}
+            {/* --- 2. EDIT PROFILE MODAL (NEW) --- */}
             {showProfileModal && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-8 animate-in zoom-in duration-200">

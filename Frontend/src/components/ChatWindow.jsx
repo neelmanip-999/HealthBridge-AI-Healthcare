@@ -89,7 +89,11 @@ const ChatWindow = ({ partner, onEndChat, userRole }) => {
         formData.append('file', file);
 
         try {
-            const res = await axios.post('http://localhost:5000/api/chat/upload', formData, {
+            // Dynamically determine the upload URL based on current location
+            const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            const uploadURL = isLocalhost ? 'http://localhost:5000/api/chat/upload' : `http://${window.location.hostname}:5000/api/chat/upload`;
+            
+            const res = await axios.post(uploadURL, formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
             const { filePath, fileType } = res.data;
@@ -104,7 +108,15 @@ const ChatWindow = ({ partner, onEndChat, userRole }) => {
                 timestamp: new Date().toISOString(),
                 roomId: roomId, 
             };
+            
+            // Add to local state immediately
+            setMessages((prev) => [...prev, messageData]);
+            
+            // Send via socket
             socket.emit('sendMessage', messageData);
+            
+            // Save to database
+            await api.post('/chat/send', messageData);
         } catch (err) {
             alert("Failed to upload file.");
         } finally {
@@ -128,7 +140,13 @@ const ChatWindow = ({ partner, onEndChat, userRole }) => {
             timestamp: new Date().toISOString(),
             roomId: roomId, 
         };
+        
+        // Add to local state
+        setMessages((prev) => [...prev, messageData]);
+        
+        // Send via socket and save to database
         socket.emit('sendMessage', messageData);
+        api.post('/chat/send', messageData).catch(err => console.error('Failed to save video call message:', err));
         
         setVideoRoomId(meetingId);
         setShowVideoModal(true);
@@ -166,7 +184,19 @@ const ChatWindow = ({ partner, onEndChat, userRole }) => {
             roomId: roomId, 
         };
 
+        // Add message to local state immediately for real-time display
+        setMessages((prev) => [...prev, messageData]);
+        
+        // Send to backend and other user
         socket.emit('sendMessage', messageData);
+        
+        // Also save to backend database
+        try {
+            await api.post('/chat/send', messageData);
+        } catch (err) {
+            console.error('Failed to save message to database:', err);
+        }
+        
         setInput('');
     };
 
@@ -203,7 +233,9 @@ const ChatWindow = ({ partner, onEndChat, userRole }) => {
                 </div>
             );
         }
-        const fullUrl = `http://localhost:5000${url}`;
+        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const baseURL = isLocalhost ? 'http://localhost:5000' : `http://${window.location.hostname}:5000`;
+        const fullUrl = `${baseURL}${url}`;
         if (type === 'image') {
             return (
                 <div className="mb-2 rounded-lg overflow-hidden border border-gray-200">

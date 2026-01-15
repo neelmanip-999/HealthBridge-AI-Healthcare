@@ -147,4 +147,87 @@ router.put('/update', verifyToken, async (req, res) => {
     }
 });
 
+// Add or update pricing/catalog
+router.post('/pricing', verifyToken, async (req, res) => {
+    try {
+        const { serviceType, name, description, price, category } = req.body;
+
+        if (!serviceType || !name || price === undefined) {
+            return res.status(400).json({ message: 'serviceType, name, and price are required' });
+        }
+
+        const hospital = await HospitalAccount.findById(req.user.id);
+        if (!hospital) {
+            return res.status(404).json({ message: 'Hospital not found' });
+        }
+
+        // Add new pricing item
+        const newPricingItem = {
+            serviceType,
+            name,
+            description,
+            price,
+            category
+        };
+
+        hospital.pricing.push(newPricingItem);
+        await hospital.save();
+
+        res.status(200).json({ message: 'Pricing added successfully', pricing: hospital.pricing });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Update specific pricing item
+router.put('/pricing/:pricingId', verifyToken, async (req, res) => {
+    try {
+        const { pricingId } = req.params;
+        const { serviceType, name, description, price, category } = req.body;
+
+        const hospital = await HospitalAccount.findById(req.user.id);
+        if (!hospital) {
+            return res.status(404).json({ message: 'Hospital not found' });
+        }
+
+        const pricingItem = hospital.pricing.id(pricingId);
+        if (!pricingItem) {
+            return res.status(404).json({ message: 'Pricing item not found' });
+        }
+
+        if (serviceType) pricingItem.serviceType = serviceType;
+        if (name) pricingItem.name = name;
+        if (description) pricingItem.description = description;
+        if (price !== undefined) pricingItem.price = price;
+        if (category) pricingItem.category = category;
+
+        await hospital.save();
+        res.status(200).json({ message: 'Pricing updated successfully', pricing: hospital.pricing });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Delete pricing item
+router.delete('/pricing/:pricingId', verifyToken, async (req, res) => {
+    try {
+        const { pricingId } = req.params;
+
+        const hospital = await HospitalAccount.findById(req.user.id);
+        if (!hospital) {
+            return res.status(404).json({ message: 'Hospital not found' });
+        }
+
+        hospital.pricing.id(pricingId).deleteOne();
+        await hospital.save();
+
+        res.status(200).json({ message: 'Pricing deleted successfully', pricing: hospital.pricing });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
 module.exports = router;

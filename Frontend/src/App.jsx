@@ -4,6 +4,7 @@ import { SocketProvider } from './context/SocketContext';
 
 // --- EXISTING PAGES ---
 import HomePage from './pages/HomePage';
+import UnifiedLogin from './pages/UnifiedLogin';
 import DoctorLogin from './pages/DoctorLogin';
 import DoctorRegister from './pages/DoctorRegister';
 import DoctorDashboard from './pages/DoctorDashboard';
@@ -11,7 +12,6 @@ import PatientLogin from './pages/PatientLogin';
 import PatientRegister from './pages/PatientRegister';
 import PatientDashboard from './pages/PatientDashboard';
 import FindDoctors from './pages/FindDoctors';
-import AIHealthAssistant from './pages/AIHealthAssistant';
 import ReportAnalysis from './pages/ReportAnalysis';
 import MapPage from './pages/MapPage';
 import Chat from './pages/chat';
@@ -45,6 +45,9 @@ const App = () => {
                 <Routes>
                     <Route path="/" element={<HomePage />} />
                     
+                    {/* Unified Login Route */}
+                    <Route path="/login" element={<UnifiedLogin />} />
+                    
                     {/* Doctor Routes */}
                     <Route path="/doctor/login" element={<DoctorLogin />} />
                     <Route path="/doctor/register" element={<DoctorRegister />} />
@@ -55,7 +58,6 @@ const App = () => {
                     <Route path="/patient/register" element={<PatientRegister />} />
                     <Route path="/patient/dashboard" element={<ProtectedRoute role="patient"><PatientDashboard /></ProtectedRoute>} />
                     <Route path="/patient/doctors" element={<ProtectedRoute role="patient"><FindDoctors /></ProtectedRoute>} />
-                    <Route path="/patient/ai-assistant" element={<ProtectedRoute role="patient"><AIHealthAssistant /></ProtectedRoute>} />
                     <Route path="/patient/report-analysis" element={<ProtectedRoute role="patient"><ReportAnalysis /></ProtectedRoute>} />
                     <Route path="/patient/map" element={<ProtectedRoute role="patient"><MapPage /></ProtectedRoute>} />
                     <Route path="/patient/chat/:doctorId" element={<ProtectedRoute role="patient"><Chat /></ProtectedRoute>} />

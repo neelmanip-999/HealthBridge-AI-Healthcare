@@ -2,7 +2,9 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import io from 'socket.io-client';
 import { useLocation } from 'react-router-dom'; 
 
-const SOCKET_SERVER_URL = "http://localhost:5000";
+// Detect if running on localhost or network
+const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const SOCKET_SERVER_URL = isLocalhost ? "http://localhost:5000" : `http://${window.location.hostname}:5000`;
 
 const SocketContext = createContext();
 

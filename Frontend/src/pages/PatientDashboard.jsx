@@ -4,7 +4,6 @@ import {
   HeartPulse,
   Stethoscope,
   Pill,
-  Brain,
   FileText,
   MapPin,
   Calendar,
@@ -15,7 +14,7 @@ import {
   PhoneIncoming, 
   Check,
   X,
-  Wifi // Added Wifi icon for connection status
+  Wifi
 } from "lucide-react";
 import { getPatientAppointments, cancelAppointment } from "../services/api";
 import { useSocket } from "../context/SocketContext"; 
@@ -82,10 +81,10 @@ const AppointmentCard = ({ apt, onJoin, onCancel }) => {
   return (
     <article className="bg-white border border-gray-100 rounded-xl p-4 md:p-6 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
       <div className="flex items-center gap-4">
-        <img src={apt.doctorId.image || "https://cdn-icons-png.flaticon.com/512/377/377429.png"} alt={`Dr. ${apt?.doctorId?.name}`} className="w-16 h-16 rounded-full object-cover border-2 border-indigo-50" />
+        <img src={apt.doctorId?.image || "https://cdn-icons-png.flaticon.com/512/377/377429.png"} alt={`Dr. ${apt?.doctorId?.name}`} className="w-16 h-16 rounded-full object-cover border-2 border-indigo-50" />
         <div>
-          <h4 className="text-lg font-semibold text-gray-900">Dr. {apt.doctorId.name}</h4>
-          <p className="text-indigo-600 font-medium text-sm">{apt.doctorId.specialization}</p>
+          <h4 className="text-lg font-semibold text-gray-900">Dr. {apt.doctorId?.name}</h4>
+          <p className="text-indigo-600 font-medium text-sm">{apt.doctorId?.specialization}</p>
           <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
             <span className="flex items-center gap-1"><Calendar className="h-4 w-4" /> {dateStr}</span>
             <span className="flex items-center gap-1"><Clock className="h-4 w-4" /> {apt.timeSlot}</span>
@@ -251,7 +250,6 @@ const PatientDashboard = () => {
           <DashboardCard title="Find a Doctor" Icon={Stethoscope} colorKey="indigo" description="View specialists, their status, and availability." onClick={() => navigate("/patient/doctors")} />
           <DashboardCard title="Medical History" Icon={HeartPulse} colorKey="red" description="Review and update your past records." onClick={() => navigate("/patient/medical-history")} />
           <DashboardCard title="Pharmacy Catalog" Icon={Pill} colorKey="yellow" description="Browse available medicines and prices." onClick={() => navigate("/patient/pharmacy-catalog")} />
-          <DashboardCard title="AI Health Assistant" Icon={Brain} colorKey="purple" description="Get instant health answers and find nearby facilities." onClick={() => navigate("/patient/ai-assistant")} />
           <DashboardCard title="Report Analysis" Icon={FileText} colorKey="green" description="AI-powered analysis of your medical reports and lab results." onClick={() => navigate("/patient/report-analysis")} />
           <DashboardCard title="Route Finder" Icon={MapPin} colorKey="teal" description="Find routes to hospitals, pharmacies, and save your locations." onClick={() => navigate("/patient/map")} />
         </div>

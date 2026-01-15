@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Building2, LogOut, MapPin, Phone, Bed, AlertCircle, Save } from 'lucide-react';
+import { Building2, LogOut, MapPin, Phone, Bed, AlertCircle, Save, Plus, Trash2, Edit2 } from 'lucide-react';
 import axios from 'axios';
 
 const HospitalDashboard = () => {
@@ -10,6 +10,14 @@ const HospitalDashboard = () => {
     const [editing, setEditing] = useState(false);
     const [formData, setFormData] = useState({});
     const [message, setMessage] = useState('');
+    const [showPricingForm, setShowPricingForm] = useState(false);
+    const [pricingForm, setPricingForm] = useState({
+        serviceType: 'Test',
+        name: '',
+        description: '',
+        price: '',
+        category: ''
+    });
     const token = localStorage.getItem('token');
 
     useEffect(() => {
@@ -71,6 +79,47 @@ const HospitalDashboard = () => {
     const handleLogout = () => {
         localStorage.clear();
         navigate('/');
+    };
+
+    const handleAddPricing = async () => {
+        try {
+            if (!pricingForm.name || !pricingForm.price) {
+                setMessage('Please fill in service name and price');
+                return;
+            }
+
+            const response = await axios.post('/api/hospital-auth/pricing', pricingForm, {
+                headers: { 'auth-token': token }
+            });
+
+            setHospital(prev => ({ ...prev, pricing: response.data.pricing }));
+            setPricingForm({
+                serviceType: 'Test',
+                name: '',
+                description: '',
+                price: '',
+                category: ''
+            });
+            setShowPricingForm(false);
+            setMessage('Pricing added successfully!');
+            setTimeout(() => setMessage(''), 3000);
+        } catch (err) {
+            setMessage('Failed to add pricing');
+        }
+    };
+
+    const handleDeletePricing = async (pricingId) => {
+        try {
+            const response = await axios.delete(`/api/hospital-auth/pricing/${pricingId}`, {
+                headers: { 'auth-token': token }
+            });
+
+            setHospital(prev => ({ ...prev, pricing: response.data.pricing }));
+            setMessage('Pricing deleted successfully!');
+            setTimeout(() => setMessage(''), 3000);
+        } catch (err) {
+            setMessage('Failed to delete pricing');
+        }
     };
 
     if (loading && !hospital) {
@@ -260,6 +309,129 @@ const HospitalDashboard = () => {
                         <div className="text-sm text-blue-800">
                             Your hospital details are displayed on the patient Route Finder map. Make sure all information is accurate.
                         </div>
+                    </div>
+                </div>
+
+                {/* Pricing Catalog Section */}
+                <div className="bg-white rounded-2xl shadow-xl p-8 mt-8">
+                    <div className="flex items-center justify-between mb-6">
+                        <h2 className="text-2xl font-bold text-gray-900">Services & Pricing Catalog</h2>
+                        <button
+                            onClick={() => setShowPricingForm(!showPricingForm)}
+                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                        >
+                            <Plus className="h-4 w-4" />
+                            Add Pricing
+                        </button>
+                    </div>
+
+                    {/* Add Pricing Form */}
+                    {showPricingForm && (
+                        <div className="bg-gray-50 p-6 rounded-lg mb-6 border border-gray-200">
+                            <h3 className="text-lg font-semibold text-gray-900 mb-4">Add New Service/Test</h3>
+                            
+                            <div className="grid grid-cols-2 gap-4 mb-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Service Type</label>
+                                    <select
+                                        name="serviceType"
+                                        value={pricingForm.serviceType}
+                                        onChange={(e) => setPricingForm(prev => ({ ...prev, serviceType: e.target.value }))}
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    >
+                                        <option value="Disease Treatment">Disease Treatment</option>
+                                        <option value="Test">Test</option>
+                                        <option value="Consultation">Consultation</option>
+                                        <option value="Surgery">Surgery</option>
+                                        <option value="Admission">Admission</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Price (₹)</label>
+                                    <input
+                                        type="number"
+                                        value={pricingForm.price}
+                                        onChange={(e) => setPricingForm(prev => ({ ...prev, price: e.target.value }))}
+                                        placeholder="Enter price"
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Service Name</label>
+                                <input
+                                    type="text"
+                                    value={pricingForm.name}
+                                    onChange={(e) => setPricingForm(prev => ({ ...prev, name: e.target.value }))}
+                                    placeholder="e.g., Blood Test, X-Ray, Consultation"
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 mb-4"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Description (Optional)</label>
+                                <textarea
+                                    value={pricingForm.description}
+                                    onChange={(e) => setPricingForm(prev => ({ ...prev, description: e.target.value }))}
+                                    placeholder="Add details about this service"
+                                    rows="2"
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 mb-4"
+                                />
+                            </div>
+
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={handleAddPricing}
+                                    className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded-lg transition-colors"
+                                >
+                                    Save Pricing
+                                </button>
+                                <button
+                                    onClick={() => setShowPricingForm(false)}
+                                    className="flex-1 bg-gray-400 hover:bg-gray-500 text-white font-bold py-2 rounded-lg transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Pricing List */}
+                    <div className="space-y-3">
+                        {hospital?.pricing && hospital.pricing.length > 0 ? (
+                            hospital.pricing.map((item, idx) => (
+                                <div key={idx} className="flex items-start justify-between p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="px-3 py-1 bg-blue-600 text-white text-xs rounded-full font-semibold">
+                                                {item.serviceType}
+                                            </span>
+                                        </div>
+                                        <h4 className="font-bold text-gray-900 text-lg">{item.name}</h4>
+                                        {item.description && (
+                                            <p className="text-gray-600 text-sm mt-1">{item.description}</p>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center gap-3 ml-4">
+                                        <div className="text-right">
+                                            <div className="text-2xl font-bold text-green-600">₹{item.price}</div>
+                                        </div>
+                                        <button
+                                            onClick={() => handleDeletePricing(item._id)}
+                                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                        >
+                                            <Trash2 className="h-5 w-5" />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="text-center py-8 text-gray-500">
+                                No pricing added yet. Click "Add Pricing" to get started.
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

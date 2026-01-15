@@ -1,15 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios'; 
-import api from '../services/api'; // Ensure this points to your configured axios instance
+import React, { useState } from 'react';
 import { 
     X, 
     Calendar, 
     Clock, 
     CreditCard, 
     CheckCircle, 
-    AlertCircle,
-    Loader2 
+    AlertCircle 
 } from 'lucide-react';
+import { bookAppointment, confirmPayment } from '../services/api';
 
 const BookingModal = ({ doctor, onClose }) => {
     const [step, setStep] = useState(1); // 1: Select Time, 2: Payment, 3: Success
@@ -17,46 +15,12 @@ const BookingModal = ({ doctor, onClose }) => {
     const [selectedTime, setSelectedTime] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
-    const [appointmentData, setAppointmentData] = useState(null); 
+    const [appointmentData, setAppointmentData] = useState(null); // Stores booking ID from backend
 
-    // --- NEW STATE FOR AVAILABILITY ---
-    const [bookedSlots, setBookedSlots] = useState([]); 
-    const [loadingSlots, setLoadingSlots] = useState(false);
+    // Generate some dummy slots for the UI (In real app, fetch from backend)
+    const timeSlots = ["10:00 AM", "10:30 AM", "11:00 AM", "04:00 PM", "04:30 PM", "05:00 PM"];
 
-    // Standard Time Slots
-    const timeSlots = [
-        "09:00 AM", "10:00 AM", "11:00 AM", 
-        "12:00 PM", "02:00 PM", "03:00 PM", 
-        "04:00 PM", "05:00 PM", "06:00 PM"
-    ];
-
-    // --- 1. FETCH BOOKED SLOTS WHEN DATE CHANGES ---
-    useEffect(() => {
-        if (selectedDate && doctor._id) {
-            fetchBookedSlots();
-        } else {
-            setBookedSlots([]); 
-        }
-    }, [selectedDate, doctor._id]);
-
-    const fetchBookedSlots = async () => {
-        setLoadingSlots(true);
-        try {
-            const token = localStorage.getItem('token');
-            // Using direct axios for this specific check, or use 'api.get' if you prefer
-            const res = await axios.get(`http://localhost:5000/api/appointments/booked-slots`, {
-                params: { doctorId: doctor._id, date: selectedDate },
-                headers: { 'auth-token': token }
-            });
-            setBookedSlots(res.data); // Expecting array like ["10:00 AM", "02:00 PM"]
-        } catch (err) {
-            console.error("Error fetching slots", err);
-        } finally {
-            setLoadingSlots(false);
-        }
-    };
-
-    // STEP 1: Create Initial Appointment
+    // STEP 1: Create Initial Appointment (Pending Payment)
     const handleProceedToPay = async () => {
         if (!selectedDate || !selectedTime) {
             setError('Please select both a date and time.');
@@ -67,14 +31,15 @@ const BookingModal = ({ doctor, onClose }) => {
             setLoading(true);
             setError('');
             
-            const res = await api.post('/appointments/book', {
+            // Call backend to initialize appointment
+            const res = await bookAppointment({
                 doctorId: doctor._id,
                 date: selectedDate,
                 timeSlot: selectedTime
             });
 
-            setAppointmentData(res.data.appointment); 
-            setStep(2); 
+            setAppointmentData(res.data.appointment); // Save the ID for the next step
+            setStep(2); // Move to Payment Screen
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to book slot');
         } finally {
@@ -82,19 +47,21 @@ const BookingModal = ({ doctor, onClose }) => {
         }
     };
 
-    // STEP 2: Simulate Payment
+    // STEP 2: Simulate Payment & Confirm
     const handlePayment = async () => {
         try {
             setLoading(true);
             
-            await new Promise(resolve => setTimeout(resolve, 1500)); // Fake delay
+            // Simulate a delay like a real payment gateway
+            await new Promise(resolve => setTimeout(resolve, 2000));
 
-            await api.post('/appointments/confirm-payment', {
+            // Call backend to confirm payment
+            await confirmPayment({
                 appointmentId: appointmentData._id,
-                paymentId: `PAY_${Math.floor(Math.random() * 1000000)}`
+                paymentId: `PAY_${Math.floor(Math.random() * 1000000)}` // Mock Payment ID
             });
 
-            setStep(3); 
+            setStep(3); // Move to Success Screen
         } catch (err) {
             setError('Payment failed. Please try again.');
         } finally {
@@ -120,6 +87,7 @@ const BookingModal = ({ doctor, onClose }) => {
                 {/* Content Body */}
                 <div className="p-6 overflow-y-auto flex-1">
                     
+                    {/* Error Message */}
                     {error && (
                         <div className="mb-4 bg-red-50 text-red-700 p-3 rounded-xl flex items-center gap-2 text-sm">
                             <AlertCircle className="h-4 w-4" />
@@ -140,10 +108,7 @@ const BookingModal = ({ doctor, onClose }) => {
                                     type="date" 
                                     className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none"
                                     min={new Date().toISOString().split('T')[0]}
-                                    onChange={(e) => {
-                                        setSelectedDate(e.target.value);
-                                        setSelectedTime(''); // Reset time when date changes
-                                    }}
+                                    onChange={(e) => setSelectedDate(e.target.value)}
                                 />
                             </div>
 
@@ -152,42 +117,22 @@ const BookingModal = ({ doctor, onClose }) => {
                                 <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
                                     <Clock className="h-4 w-4 text-green-600" />
                                     Select Time Slot
-                                    {loadingSlots && <Loader2 className="h-3 w-3 animate-spin ml-2 text-green-500"/>}
                                 </label>
-                                
-                                {!selectedDate ? (
-                                    <p className="text-sm text-gray-400 italic">Please select a date first to see availability.</p>
-                                ) : (
-                                    <div className="grid grid-cols-3 gap-3">
-                                        {timeSlots.map((slot) => {
-                                            // --- CHECK AVAILABILITY ---
-                                            const isTaken = bookedSlots.includes(slot);
-                                            const isSelected = selectedTime === slot;
-
-                                            return (
-                                                <button
-                                                    key={slot}
-                                                    disabled={isTaken} // Disable if taken
-                                                    onClick={() => setSelectedTime(slot)}
-                                                    className={`
-                                                        py-2 px-3 text-sm rounded-lg border transition-all
-                                                        ${isTaken 
-                                                            ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed line-through' // Taken Style
-                                                            : isSelected 
-                                                                ? 'bg-green-600 text-white border-green-600 shadow-md transform scale-105' 
-                                                                : 'border-gray-200 text-gray-600 hover:border-green-400 hover:bg-green-50'
-                                                        }
-                                                    `}
-                                                >
-                                                    {slot}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-                                {selectedDate && bookedSlots.length > 0 && (
-                                    <p className="text-xs text-red-500 mt-1">Some slots are already booked.</p>
-                                )}
+                                <div className="grid grid-cols-3 gap-3">
+                                    {timeSlots.map((slot) => (
+                                        <button
+                                            key={slot}
+                                            onClick={() => setSelectedTime(slot)}
+                                            className={`py-2 px-3 text-sm rounded-lg border transition-all ${
+                                                selectedTime === slot 
+                                                ? 'bg-green-600 text-white border-green-600 shadow-md' 
+                                                : 'border-gray-200 text-gray-600 hover:border-green-400 hover:bg-green-50'
+                                            }`}
+                                        >
+                                            {slot}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
 
                             {/* Footer Price */}
@@ -198,8 +143,8 @@ const BookingModal = ({ doctor, onClose }) => {
                                 </div>
                                 <button 
                                     onClick={handleProceedToPay}
-                                    disabled={loading || !selectedTime}
-                                    className="bg-gray-900 text-white py-3 px-6 rounded-xl font-semibold hover:bg-black transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                    disabled={loading}
+                                    className="bg-gray-900 text-white py-3 px-6 rounded-xl font-semibold hover:bg-black transition-all disabled:opacity-50"
                                 >
                                     {loading ? 'Processing...' : 'Proceed to Pay'}
                                 </button>

@@ -38,7 +38,6 @@ mongoose.connect(process.env.MONGO_URI)
 const doctorRoutes = require('./routes/doctor');
 const patientRoutes = require('./routes/patient');
 const chatRoutes = require('./routes/chat');
-const aiAssistantRoutes = require('./routes/aiAssistant');
 const appointmentRoutes = require('./routes/appointment');
 const reportAnalysisRoutes = require('./routes/reportAnalysis');
 const pharmacyRoutes = require('./routes/pharmacy');
@@ -50,7 +49,6 @@ const hospitalAuthRoutes = require('./routes/hospitalAuth');
 app.use('/api/doctor', doctorRoutes);
 app.use('/api/patient', patientRoutes);
 app.use('/api/chat', chatRoutes);
-app.use('/api/ai', aiAssistantRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/reports', reportAnalysisRoutes);
 app.use('/api/pharmacy', pharmacyRoutes);

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, MapPin, Navigation, Save, Trash2, Search, Hospital } from 'lucide-react';
+import { ArrowLeft, MapPin, Navigation, Save, Trash2, Search, Building2 } from 'lucide-react';
 import axios from 'axios';
 import { GoogleMap, LoadScript, Marker, DirectionsRenderer, Autocomplete, InfoWindow } from '@react-google-maps/api';
 
@@ -339,7 +339,7 @@ const MapPage = () => {
                                 : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
                         }`}
                     >
-                        <Hospital className="h-4 w-4" />
+                        <Building2 className="h-4 w-4" />
                         {showHospitals ? 'Hide' : 'Show'} Registered Hospitals ({hospitals.length})
                     </button>
                     {hospitals.length === 0 && (
@@ -349,27 +349,72 @@ const MapPage = () => {
 
                 <hr className="border-gray-700 my-4" />
 
-                {/* Save Current Location */}
-                <div className="mb-4">
-                    <label className="block text-xs text-gray-400 mb-2">Save current location</label>
-                    <div className="flex gap-2">
-                        <input
-                            type="text"
-                            placeholder="Name for this location"
-                            value={saveName}
-                            onChange={(e) => setSaveName(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleSaveLocation()}
-                            className="flex-1 px-3 py-2 rounded-lg border-none bg-white/10 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
+                {/* Selected Hospital Details */}
+                {selectedHospital ? (
+                    <div className="mb-4">
+                        <h3 className="text-lg font-bold text-white mb-3">{selectedHospital.name}</h3>
+                        <div className="space-y-2 text-sm">
+                            {selectedHospital.address && (
+                                <div className="text-gray-300">
+                                    <span className="text-gray-400">Address:</span> {selectedHospital.address}
+                                </div>
+                            )}
+                            {selectedHospital.phone && (
+                                <div className="text-gray-300">
+                                    <span className="text-gray-400">Phone:</span> {selectedHospital.phone}
+                                </div>
+                            )}
+                            {selectedHospital.beds && (
+                                <div className="text-gray-300">
+                                    <span className="text-gray-400">Beds:</span> {selectedHospital.beds}
+                                </div>
+                            )}
+                            {selectedHospital.specialties && selectedHospital.specialties.length > 0 && (
+                                <div className="text-gray-300">
+                                    <span className="text-gray-400">Specialties:</span> {selectedHospital.specialties.join(', ')}
+                                </div>
+                            )}
+                        </div>
+                        
+                        {/* Pricing Section */}
+                        {selectedHospital.pricing && selectedHospital.pricing.length > 0 && (
+                            <div className="mt-4 pt-4 border-t border-gray-700">
+                                <h4 className="font-semibold text-white mb-3 text-sm flex items-center gap-2">
+                                    💊 Services & Pricing
+                                </h4>
+                                <div className="max-h-56 overflow-y-auto space-y-2">
+                                    {selectedHospital.pricing.map((item, idx) => (
+                                        <div key={idx} className="bg-gradient-to-r from-blue-900/40 to-indigo-900/40 p-3 rounded-lg border border-blue-700/30 text-xs">
+                                            <div className="flex justify-between items-start mb-1">
+                                                <div className="flex-1">
+                                                    <div className="font-semibold text-white text-sm">{item.name}</div>
+                                                    <div className="text-gray-400 text-xs mt-0.5">{item.serviceType}</div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <div className="text-green-400 font-bold text-sm">₹{item.price}</div>
+                                                </div>
+                                            </div>
+                                            {item.description && (
+                                                <div className="text-gray-400 text-xs mt-2 border-t border-gray-600/30 pt-2">{item.description}</div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        
                         <button
-                            onClick={handleSaveLocation}
-                            className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg font-semibold transition-colors flex items-center gap-2"
+                            onClick={() => setSelectedHospital(null)}
+                            className="mt-4 w-full px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm font-medium transition-colors"
                         >
-                            <Save className="h-4 w-4" />
-                            Save
+                            Clear Selection
                         </button>
                     </div>
-                </div>
+                ) : (
+                    <div className="text-gray-400 text-sm text-center py-4">
+                        Click a hospital marker to view details and pricing
+                    </div>
+                )}
 
                 {/* Saved Locations */}
                 <div className="mb-2">

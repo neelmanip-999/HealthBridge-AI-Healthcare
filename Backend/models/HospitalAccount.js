@@ -1,5 +1,27 @@
 const mongoose = require('mongoose');
 
+const PricingItemSchema = new mongoose.Schema({
+    serviceType: {
+        type: String,
+        required: true,
+        enum: ['Disease Treatment', 'Test', 'Consultation', 'Surgery', 'Admission', 'Other']
+    },
+    name: {
+        type: String,
+        required: true
+    },
+    description: {
+        type: String
+    },
+    price: {
+        type: Number,
+        required: true
+    },
+    category: {
+        type: String
+    }
+});
+
 const HospitalAccountSchema = new mongoose.Schema({
     name: {
         type: String,
@@ -42,6 +64,7 @@ const HospitalAccountSchema = new mongoose.Schema({
         type: Boolean,
         default: false
     },
+    pricing: [PricingItemSchema],
     role: {
         type: String,
         default: 'hospital'

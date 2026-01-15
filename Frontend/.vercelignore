@@ -1,0 +1,8 @@
+# Vercel build and dependencies
+node_modules/
+npm-debug.log
+.env
+.env.local
+.env.*.local
+dist
+.DS_Store

@@ -8,7 +8,7 @@ const orderSchema = new mongoose.Schema({
   },
   pharmacyId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'PharmacyUser', // UPDATED to match 'PharmacyUser.js'
+    ref: 'PharmacyUser',
     required: true
   },
   medicineId: {
@@ -28,6 +28,27 @@ const orderSchema = new mongoose.Schema({
     type: Number,
     default: 1
   },
+  // --- EXISTING FIELDS ---
+  prescription: {
+    type: String,
+    default: ''
+  },
+  appointmentId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Appointment',
+    default: null
+  },
+  // --- NEW DELIVERY FIELDS ---
+  fulfillmentType: { 
+      type: String, 
+      enum: ['Pickup', 'Delivery'], 
+      default: 'Pickup' 
+  },
+  deliveryAddress: { 
+      type: String, 
+      default: '' 
+  },
+  // ---------------------------
   status: {
     type: String,
     enum: ['Pending', 'Ready', 'Completed', 'Cancelled'],

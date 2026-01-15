@@ -4,7 +4,8 @@ const { Server } = require('socket.io');
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const cors = require('cors');
-const Chat = require('./models/Chat'); // Ensure this path is correct
+const Chat = require('./models/Chat'); 
+const path = require('path'); // --- NEW: Import Path module
 
 dotenv.config();
 
@@ -23,6 +24,10 @@ const PORT = process.env.PORT || 5000;
 
 app.use(cors());
 app.use(express.json());
+
+// --- NEW: Serve Uploads Folder Statically ---
+// This allows you to access images via http://localhost:5000/uploads/filename.jpg
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGO_URI)
@@ -51,19 +56,25 @@ const userSocketMap = {}; // { userId: socketId }
 
 io.on('connection', (socket) => {
     // NOTE: This part is crucial for mapping user IDs to socket IDs
-    // Ensure your frontend passes { auth: { userId: '...' } }
     const userId = socket.handshake.auth.userId;
     
     if (userId) {
         userSocketMap[userId] = socket.id;
         console.log(`User connected: ${userId} with socket ID: ${socket.id}`);
+        
+        // AUTOMATICALLY JOIN USER ROOM
+        socket.join(userId); 
     }
 
     // --- ROOM LOGIC ---
-    // The client calls this when they open a chat window
     socket.on('join_room', (room) => {
         socket.join(room);
         console.log(`User ${socket.id} joined room: ${room}`);
+    });
+
+    socket.on('join_user_room', (id) => {
+        socket.join(id);
+        console.log(`User manually joined personal room: ${id}`);
     });
 
     socket.on('disconnect', () => {
@@ -74,57 +85,58 @@ io.on('connection', (socket) => {
         }
     });
 
-    // --- APPOINTMENT NOTIFICATIONS ---
+    // --- 1. APPOINTMENT NOTIFICATIONS ---
     socket.on('new_appointment_booked', (data) => {
-        const doctorSocketId = userSocketMap[data.doctorId];
-        if (doctorSocketId) {
-            io.to(doctorSocketId).emit('appointment_notification', {
-                message: `New Appointment Request from ${data.patientName}`,
-                appointmentId: data.appointmentId
-            });
-        }
+        io.to(data.doctorId).emit('appointment_notification', {
+             message: `New Appointment Request from ${data.patientName}`,
+             appointmentId: data.appointmentId
+        });
     });
 
-    // --- CONSULTATION EVENTS ---
-    socket.on('startConsultation', (data) => {
-        const doctorSocketId = userSocketMap[data.doctorId];
-        if (doctorSocketId) {
-            console.log(`Notifying Doctor ${data.doctorId} of new chat from Patient ${data.patient._id}`);
-            io.to(doctorSocketId).emit('consultationStarted', {
-                partner: data.patient,
-                sessionId: `${data.patient._id}-${data.doctorId}`
-            });
-        } else {
-            console.log(`Doctor ${data.doctorId} is not online. Cannot start consultation.`);
-        }
+    // --- 2. LIVE SESSION ALERTS 📞 ---
+    socket.on('start_session', (data) => {
+        const { patientId, doctorId, doctorName } = data;
+        console.log(`Doctor ${doctorName} starting session with Patient ${patientId}`);
+        io.to(patientId).emit('session_request', {
+            doctorId: doctorId,
+            doctorName: doctorName,
+            sessionId: `${patientId}-${doctorId}`
+        });
     });
 
-    // --- CHAT MESSAGING LOGIC ---
+    // --- 3. PHARMACY ORDER UPDATES 💊 ---
+    socket.on('pharmacy_order_update', (data) => {
+        const { patientId, status, medicineName } = data;
+        io.to(patientId).emit('receive_order_update', {
+            status: status,
+            medicineName: medicineName,
+            message: `Your order for ${medicineName} is now ${status}!`
+        });
+    });
+
+    // --- 4. CHAT MESSAGING LOGIC ---
     socket.on('sendMessage', async (data) => {
         try {
-            // Create new message object
+            // Create new message object (Supports attachments now)
             const newMessage = new Chat({
                 senderId: data.senderId,
                 receiverId: data.receiverId,
                 senderRole: data.senderRole,
-                message: data.message,
+                message: data.message || '', // Allow empty message if attachment exists
+                attachmentUrl: data.attachmentUrl || null, // New Field
+                attachmentType: data.attachmentType || 'none', // New Field
                 timestamp: data.timestamp || Date.now() 
             });
 
-            // Save to Database (Persistence)
+            // Save to Database
             const savedMessage = await newMessage.save();
-            console.log('Message saved to DB:', savedMessage._id);
-
-            // Use the roomId passed from the client
+            
             const roomId = data.roomId; 
             
             if (roomId) {
-                // Emit to ALL sockets in the specified room (sender AND receiver)
                 io.to(roomId).emit('receiveMessage', savedMessage);
             } else {
-                console.warn(`Message ${savedMessage._id} sent without a room ID. Using fallback.`);
-                // Fallback (for older clients or error)
-                socket.emit('receiveMessage', savedMessage); // Echo to sender
+                socket.emit('receiveMessage', savedMessage); 
                 const receiverSocketId = userSocketMap[data.receiverId];
                 if (receiverSocketId) {
                     io.to(receiverSocketId).emit('receiveMessage', savedMessage);

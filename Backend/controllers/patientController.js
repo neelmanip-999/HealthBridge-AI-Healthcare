@@ -2,9 +2,9 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const Patient = require('../models/Patient');
 const Doctor = require('../models/Doctor'); 
-const Appointment = require('../models/Appointment'); // NEW: For Medical History
-const Medicine = require('../models/Medicine');       // NEW: For Pharmacy Catalog
-const Order = require('../models/Order');             // NEW: For reserving medicines
+const Appointment = require('../models/Appointment'); 
+const Medicine = require('../models/Medicine');       
+const Order = require('../models/Order');             
 const { patientRegisterValidation, patientLoginValidation } = require('../validations/patientValidation');
 
 // Shared function to generate JWT
@@ -98,19 +98,18 @@ exports.connectWithDoctor = async (req, res) => {
 };
 
 // ==========================================
-// 3. MEDICAL HISTORY (New Feature)
+// 3. MEDICAL HISTORY 
 // ==========================================
 
 // GET /patient/medical-history
-// Fetches only COMPLETED appointments which contain diagnosis/prescription
 exports.getMedicalHistory = async (req, res) => {
     try {
         const history = await Appointment.find({ 
             patientId: req.user.id,
-            status: 'completed' // Only show finished consultations
+            status: 'completed' 
         })
-        .populate('doctorId', 'name specialization') // Show Doctor details
-        .sort({ date: -1 }); // Newest first
+        .populate('doctorId', 'name specialization') 
+        .sort({ date: -1 });
 
         res.json(history);
     } catch (err) {
@@ -119,16 +118,14 @@ exports.getMedicalHistory = async (req, res) => {
 };
 
 // ==========================================
-// 4. PHARMACY CATALOG (New Feature)
+// 4. PHARMACY CATALOG & ORDERS (UPDATED)
 // ==========================================
 
 // GET /patient/medicines
-// Fetches all available medicines from all pharmacies
 exports.getAllMedicines = async (req, res) => {
     try {
-        // Find medicines with stock > 0
         const medicines = await Medicine.find({ stock: { $gt: 0 } })
-            .populate('pharmacyId', 'name address'); // Show which pharmacy sells it
+            .populate('pharmacyId', 'name address'); 
         
         res.json(medicines);
     } catch (err) {
@@ -136,10 +133,10 @@ exports.getAllMedicines = async (req, res) => {
     }
 };
 
-// POST /patient/reserve-medicine
-// Creates an order for "Click & Collect"
+// POST /patient/reserve-medicine (UPDATED WITH DELIVERY LOGIC)
 exports.reserveMedicine = async (req, res) => {
-    const { pharmacyId, medicineId, medicineName, price } = req.body;
+    // Added fulfillmentType and deliveryAddress
+    const { pharmacyId, medicineId, medicineName, price, prescription, appointmentId, fulfillmentType, deliveryAddress } = req.body;
 
     try {
         const newOrder = new Order({
@@ -148,12 +145,31 @@ exports.reserveMedicine = async (req, res) => {
             medicineId,
             medicineName,
             price,
-            status: 'Pending'
+            status: 'Pending',
+            // Prescription Details
+            prescription: prescription || '', 
+            appointmentId: appointmentId || null,
+            // Delivery Details (New)
+            fulfillmentType: fulfillmentType || 'Pickup',
+            deliveryAddress: deliveryAddress || ''
         });
 
         const savedOrder = await newOrder.save();
-        res.status(201).json({ message: 'Medicine reserved successfully!', order: savedOrder });
+        res.status(201).json({ message: 'Order placed successfully!', order: savedOrder });
     } catch (err) {
-        res.status(400).json({ message: 'Error reserving medicine' });
+        console.error(err);
+        res.status(400).json({ message: 'Error placing order' });
+    }
+};
+
+// GET /patient/orders 
+exports.getPatientOrders = async (req, res) => {
+    try {
+        const orders = await Order.find({ patientId: req.user.id })
+            .populate('pharmacyId', 'name address phone') 
+            .sort({ orderDate: -1 }); 
+        res.json(orders);
+    } catch (err) {
+        res.status(500).json({ message: 'Error fetching orders' });
     }
 };

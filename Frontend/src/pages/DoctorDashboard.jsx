@@ -1,19 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { 
-    Stethoscope, 
-    LogOut, 
-    MessageSquare, 
-    Briefcase, 
-    Calendar, 
-    Clock, 
-    User,
-    Bell,
-    FileText,      // New
-    CheckCircle,   // New
-    Activity,      // New
-    X              // New
+    Stethoscope, LogOut, MessageSquare, Briefcase, Calendar, Clock, 
+    User, Bell, FileText, CheckCircle, Activity, X, TrendingUp, 
+    Users, DollarSign, ChevronRight, ChevronLeft, MapPin, Edit3, Save, Loader2 
 } from 'lucide-react';
 import api, { getDoctorAppointments } from '../services/api'; 
 import ChatWindow from '../components/ChatWindow';
@@ -22,37 +13,40 @@ import { useSocket } from '../context/SocketContext';
 const DoctorDashboard = () => {
     const navigate = useNavigate();
     const { socket, isConnected } = useSocket();
+    // Load doctor from local storage, but prefer state for live updates
     const [doctor, setDoctor] = useState(() => JSON.parse(localStorage.getItem('user')) || {});
+    
+    // Data State
     const [appointments, setAppointments] = useState([]);
-    const [statusError, setStatusError] = useState('');
     const [chatSession, setChatSession] = useState(null);
-    const [notification, setNotification] = useState(null); 
+    const [notification, setNotification] = useState(null);
+    
+    // Dashboard Logic State
+    const [activeTab, setActiveTab] = useState('upcoming'); // 'upcoming' | 'history'
+    const [selectedDate, setSelectedDate] = useState(null); // Filter by calendar date
+    const [currentMonth, setCurrentMonth] = useState(new Date()); // For calendar navigation
 
-    // --- NEW STATE FOR COMPLETION MODAL ---
-    const [showModal, setShowModal] = useState(false);
+    // Modals State
+    const [showCompleteModal, setShowCompleteModal] = useState(false);
+    const [showProfileModal, setShowProfileModal] = useState(false); // --- NEW: Profile Modal
     const [selectedAppointment, setSelectedAppointment] = useState(null);
-    const [consultationData, setConsultationData] = useState({
-        diagnosis: '',
-        prescription: ''
-    });
+    
+    // Form Data
+    const [consultationData, setConsultationData] = useState({ diagnosis: '', prescription: '' });
+    const [profileData, setProfileData] = useState({ ...doctor }); // --- NEW: Profile Form Data
 
-    // 1. Initial Data Fetch & Socket Setup
+    // --- 1. INITIAL FETCH & SOCKETS ---
     useEffect(() => {
         fetchAppointments();
-
         if (socket && doctor._id) {
             socket.emit('join_room', doctor._id);
-
             socket.on('appointment_notification', (data) => {
                 setNotification(data.message); 
                 fetchAppointments(); 
                 setTimeout(() => setNotification(null), 5000);
             });
         }
-
-        return () => {
-            if (socket) socket.off('appointment_notification');
-        };
+        return () => { if (socket) socket.off('appointment_notification'); };
     }, [socket, doctor._id]);
 
     const fetchAppointments = async () => {
@@ -64,6 +58,76 @@ const DoctorDashboard = () => {
         }
     };
 
+    // --- 2. STATISTICS ENGINE (FIXED & ROBUST) 📊 ---
+    const stats = useMemo(() => {
+        // Filter only completed appointments
+        const completed = appointments.filter(a => a.status === 'completed');
+        
+        // Count unique patients
+        const uniquePatients = new Set(completed.map(a => a.patientId?._id)).size;
+        
+        // Calculate Earnings: Use the appointment price if available, else doctor's current fee
+        // This ensures historical accuracy if fees change later
+        const totalEarnings = completed.reduce((sum, appt) => {
+            const fee = appt.price || parseInt(doctor.fees) || 0; 
+            return sum + fee;
+        }, 0);
+        
+        return {
+            earnings: totalEarnings,
+            patients: uniquePatients,
+            completedCount: completed.length,
+            pendingCount: appointments.filter(a => a.status !== 'completed' && a.status !== 'cancelled').length
+        };
+    }, [appointments, doctor.fees]);
+
+    // --- 3. FILTERING LOGIC (Calendar + Tabs) ---
+    const filteredAppointments = useMemo(() => {
+        let filtered = appointments;
+
+        // Tab Filter
+        if (activeTab === 'upcoming') {
+            filtered = filtered.filter(a => a.status !== 'completed' && a.status !== 'cancelled');
+        } else {
+            filtered = filtered.filter(a => a.status === 'completed' || a.status === 'cancelled');
+        }
+
+        // Calendar Date Filter
+        if (selectedDate) {
+            filtered = filtered.filter(a => {
+                const apptDate = new Date(a.date).toDateString();
+                const filterDate = selectedDate.toDateString();
+                return apptDate === filterDate;
+            });
+        }
+
+        // Sort by Date/Time
+        return filtered.sort((a, b) => new Date(a.date) - new Date(b.date));
+    }, [appointments, activeTab, selectedDate]);
+
+    const upNext = appointments
+        .filter(a => a.status !== 'completed' && a.status !== 'cancelled' && new Date(a.date) >= new Date().setHours(0,0,0,0))
+        .sort((a, b) => new Date(a.date) - new Date(b.date))[0];
+
+    // --- 4. CALENDAR GENERATOR 📅 ---
+    const calendarGrid = useMemo(() => {
+        const year = currentMonth.getFullYear();
+        const month = currentMonth.getMonth();
+        const days = new Date(year, month + 1, 0).getDate();
+        const firstDay = new Date(year, month, 1).getDay();
+        
+        const grid = [];
+        for (let i = 0; i < firstDay; i++) grid.push(null);
+        for (let i = 1; i <= days; i++) grid.push(new Date(year, month, i));
+        return grid;
+    }, [currentMonth]);
+
+    const hasAppointmentOnDate = (date) => {
+        if (!date) return false;
+        return appointments.some(a => new Date(a.date).toDateString() === date.toDateString());
+    };
+
+    // --- HANDLERS ---
     const handleUpdateStatus = async (newStatus) => {
         try {
             const res = await api.put('/doctor/status', { status: newStatus });
@@ -71,21 +135,55 @@ const DoctorDashboard = () => {
             setDoctor(updatedDoctor);
             localStorage.setItem('user', JSON.stringify(updatedDoctor));
             if (socket) socket.emit('doctorStatusUpdate', { id: doctor._id, status: newStatus });
-        } catch (err) {
-            setStatusError('Failed to update status.');
-        }
+        } catch (err) { alert('Status update failed'); }
     };
 
-    const handleStartChatFromAppointment = (appointment) => {
+    const handleStartChat = (appointment) => {
+        if (socket) {
+            socket.emit('start_session', {
+                patientId: appointment.patientId._id,
+                doctorId: doctor._id,
+                doctorName: doctor.name
+            });
+        }
         setChatSession({ 
             partner: appointment.patientId, 
             sessionId: `${appointment.patientId._id}-${doctor._id}` 
         });
     };
 
-    const handleEndChat = () => {
-        setChatSession(null);
-        handleUpdateStatus('free');
+    const handleComplete = async (e) => {
+        e.preventDefault();
+        try {
+            const token = localStorage.getItem('token');
+            await axios.post('http://localhost:5000/api/appointments/complete', {
+                appointmentId: selectedAppointment._id,
+                ...consultationData
+            }, { headers: { 'auth-token': token } });
+            
+            // --- OPTIMISTIC UPDATE (Fix for "Earnings won't update") ---
+            // Manually update the local state immediately so the UI reflects changes instantly
+            setAppointments(prev => prev.map(a => 
+                a._id === selectedAppointment._id ? { ...a, status: 'completed' } : a
+            ));
+            
+            setShowCompleteModal(false);
+            alert('Consultation Completed! Earnings updated.');
+        } catch (err) { alert("Failed to save."); }
+    };
+
+    const handleProfileUpdate = async (e) => {
+        e.preventDefault();
+        try {
+            // In a real app, you would send this to the backend: await api.put('/doctor/profile', profileData);
+            // For now, we update local state/storage to simulate it
+            setDoctor(profileData);
+            localStorage.setItem('user', JSON.stringify(profileData));
+            setShowProfileModal(false);
+            alert("Profile Updated Successfully!");
+        } catch (err) {
+            alert("Failed to update profile.");
+        }
     };
 
     const handleLogout = () => {
@@ -95,236 +193,218 @@ const DoctorDashboard = () => {
         navigate('/');
     };
 
-    // --- NEW FUNCTIONS FOR COMPLETION ---
-    const openCompleteModal = (apt) => {
-        setSelectedAppointment(apt);
-        setConsultationData({ diagnosis: '', prescription: '' });
-        setShowModal(true);
-    };
-
-    const handleCompleteAppointment = async (e) => {
-        e.preventDefault();
-        const token = localStorage.getItem('token'); // Ensure we have token for direct call
-        try {
-            await axios.post('http://localhost:5000/api/appointments/complete', {
-                appointmentId: selectedAppointment._id,
-                diagnosis: consultationData.diagnosis,
-                prescription: consultationData.prescription
-            }, {
-                headers: { 'auth-token': token }
-            });
-
-            // Close modal and refresh
-            setShowModal(false);
-            fetchAppointments();
-            alert('Consultation Saved Successfully!');
-        } catch (err) {
-            console.error("Error completing appointment", err);
-            alert("Failed to save details. Please try again.");
-        }
-    };
-
-    const formatDate = (dateString) => {
-        const options = { year: 'numeric', month: 'long', day: 'numeric' };
-        return new Date(dateString).toLocaleDateString(undefined, options);
-    };
-
     return (
-        <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-blue-50 to-purple-50 p-6 md:p-10 relative overflow-hidden">
+        <div className="min-h-screen bg-gray-50 flex flex-col">
             
-            {/* Notification Banner */}
-            {notification && (
-                <div className="fixed top-5 right-5 z-50 bg-green-600 text-white px-6 py-4 rounded-xl shadow-2xl animate-bounce flex items-center gap-3">
-                    <Bell className="h-6 w-6" />
+            {/* --- TOP NAVIGATION --- */}
+            <header className="bg-white border-b border-gray-200 sticky top-0 z-30 px-6 py-4 flex justify-between items-center shadow-sm">
+                <div className="flex items-center gap-3">
+                    <div className="bg-indigo-600 p-2 rounded-lg text-white"><Stethoscope className="w-6 h-6" /></div>
                     <div>
-                        <h4 className="font-bold">New Booking!</h4>
-                        <p className="text-sm">{notification}</p>
+                        <h1 className="text-xl font-bold text-gray-800">Dr. {doctor.name}</h1>
+                        <div className="flex items-center gap-2 text-xs text-gray-500">
+                            <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></span>
+                            {isConnected ? 'System Online' : 'Reconnecting...'}
+                        </div>
                     </div>
                 </div>
-            )}
 
-            {/* Header */}
-            <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center bg-white/80 backdrop-blur-sm p-8 shadow-2xl rounded-3xl mb-10 border-t-4 border-indigo-600 relative z-10">
-                <div className="flex items-center space-x-4 mb-4 lg:mb-0">
-                    <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-100 rounded-2xl">
-                        <Stethoscope className="h-8 w-8 text-indigo-600" />
+                <div className="flex items-center gap-4">
+                    <div className="bg-gray-100 p-1 rounded-lg flex text-sm font-medium">
+                        <button onClick={() => handleUpdateStatus('free')} className={`px-3 py-1.5 rounded-md transition ${doctor.status === 'free' ? 'bg-white text-green-700 shadow-sm' : 'text-gray-500'}`}>Online</button>
+                        <button onClick={() => handleUpdateStatus('busy')} className={`px-3 py-1.5 rounded-md transition ${doctor.status === 'busy' ? 'bg-white text-yellow-700 shadow-sm' : 'text-gray-500'}`}>Busy</button>
                     </div>
-                    <div>
-                        <h1 className="text-4xl font-extrabold text-gray-900">Dr. {doctor?.name}'s Portal</h1>
-                        <p className="text-gray-500 mt-1">Professional Healthcare Dashboard</p>
-                    </div>
-                </div>
-                <div className="flex items-center space-x-4">
-                    <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
-                    <span className={`px-3 py-1 rounded-full text-sm font-semibold capitalize ${
-                        doctor.status === 'free' ? 'bg-green-100 text-green-700' : 
-                        doctor.status === 'busy' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-200 text-gray-700'
-                    }`}>
-                        {doctor.status}
-                    </span>
-                    <button onClick={handleLogout} className="flex items-center space-x-2 text-red-600 hover:bg-red-50 px-4 py-2 rounded-lg transition">
-                        <LogOut className="w-4 h-4" /> 
-                        <span>Logout</span>
-                    </button>
+                    <button onClick={handleLogout} className="text-gray-400 hover:text-red-500 transition"><LogOut className="w-5 h-5" /></button>
                 </div>
             </header>
 
-            <main className="grid grid-cols-1 lg:grid-cols-3 gap-8 relative z-10">
-                {/* --- LEFT COLUMN: PROFILE & CONTROLS --- */}
-                <div className="lg:col-span-1 bg-white/80 backdrop-blur-sm p-8 rounded-3xl shadow-2xl border border-indigo-100 h-fit">
-                    <h2 className="text-2xl font-bold mb-6 text-indigo-600 border-b border-indigo-200 pb-4 flex items-center space-x-3">
-                        <Briefcase className="w-5 h-5" />
-                        <span>Profile Management</span>
-                    </h2>
+            <div className="flex flex-1 overflow-hidden">
+                
+                {/* --- LEFT SIDEBAR (Organizer) --- */}
+                <aside className="w-80 bg-white border-r border-gray-200 hidden lg:flex flex-col overflow-y-auto p-6 gap-8">
                     
-                    <div className="space-y-4">
-                        <div className="bg-indigo-50 p-4 rounded-2xl border border-indigo-100">
-                            <p className="text-sm text-gray-600 mb-1">Specialization</p>
-                            <p className="text-lg font-semibold text-indigo-700">{doctor?.specialization}</p>
+                    {/* PROFILE CARD (Improved) */}
+                    <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 p-3 opacity-0 group-hover:opacity-100 transition">
+                            <button onClick={() => { setProfileData(doctor); setShowProfileModal(true); }} className="bg-white/20 hover:bg-white/30 p-2 rounded-full backdrop-blur-sm"><Edit3 className="w-4 h-4 text-white" /></button>
                         </div>
-                        <div className="bg-green-50 p-4 rounded-2xl border border-green-100">
-                            <p className="text-sm text-gray-600 mb-1">Consultation Fees</p>
-                            <p className="text-2xl font-bold text-green-700">${doctor?.fees}</p>
+                        <div className="flex items-center gap-4 mb-4">
+                            <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-2xl font-bold border-2 border-white/30">
+                                {doctor.name?.[0]}
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-lg leading-tight">Dr. {doctor.name}</h3>
+                                <p className="text-indigo-100 text-sm">{doctor.specialization}</p>
+                            </div>
+                        </div>
+                        <div className="space-y-2 text-sm text-indigo-100">
+                            <div className="flex items-center gap-2"><Briefcase className="w-4 h-4 opacity-70"/> {doctor.experience || '5+ Years'} Exp.</div>
+                            <div className="flex items-center gap-2"><MapPin className="w-4 h-4 opacity-70"/> {doctor.address || 'Main Clinic, NY'}</div>
                         </div>
                     </div>
 
-                    <div className="mt-8 pt-6 border-t border-gray-200">
-                        <h3 className="text-lg font-bold mb-4 text-gray-800">Set Availability</h3>
-                        <div className='grid grid-cols-1 gap-3'>
-                            <button onClick={() => handleUpdateStatus('free')} className="py-3 bg-green-100 text-green-700 rounded-xl hover:bg-green-200 font-semibold transition">Set Free (Ready)</button>
-                            <button onClick={() => handleUpdateStatus('busy')} className="py-3 bg-yellow-100 text-yellow-700 rounded-xl hover:bg-yellow-200 font-semibold transition">Set Busy</button>
-                            <button onClick={() => handleUpdateStatus('offline')} className="py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 font-semibold transition">Set Offline</button>
-                        </div>
-                    </div>
-                </div>
-
-                {/* --- RIGHT COLUMN: APPOINTMENTS OR CHAT --- */}
-                <div className="lg:col-span-2 bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl border border-indigo-100 flex flex-col min-h-[75vh] overflow-hidden">
-                    
-                    {chatSession ? (
-                        // 1. ACTIVE CHAT VIEW
-                        <ChatWindow 
-                            partner={chatSession.partner}
-                            onEndChat={handleEndChat}
-                            userRole="doctor"
-                        />
-                    ) : (
-                        // 2. APPOINTMENTS LIST VIEW
-                        <div className="p-8 h-full flex flex-col">
-                            <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
-                                <Calendar className="h-6 w-6 text-indigo-600" />
-                                Upcoming Appointments
-                            </h2>
-
-                            {appointments.length === 0 ? (
-                                <div className='flex flex-col items-center justify-center flex-1 opacity-60'>
-                                    <MessageSquare className="h-16 w-16 text-gray-300 mb-4" />
-                                    <p className="text-gray-500">No appointments scheduled yet.</p>
+                    {/* UP NEXT WIDGET */}
+                    {upNext ? (
+                        <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-5 shadow-sm relative overflow-hidden">
+                            <div className="absolute top-0 right-0 bg-indigo-200 text-indigo-800 text-[10px] font-bold px-2 py-1 rounded-bl-lg">UP NEXT</div>
+                            <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-2">Next Patient</h3>
+                            <div className="flex items-center gap-3 mb-3">
+                                <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-indigo-700 font-bold shadow-sm">{upNext.patientId.name[0]}</div>
+                                <div>
+                                    <p className="font-bold text-gray-800">{upNext.patientId.name}</p>
+                                    <p className="text-xs text-gray-500">{upNext.timeSlot}</p>
                                 </div>
-                            ) : (
-                                <div className="space-y-4 overflow-y-auto pr-2 custom-scrollbar">
-                                    {appointments.map((apt) => (
-                                        <div key={apt._id} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-all flex flex-col lg:flex-row justify-between items-center gap-4">
-                                            
-                                            <div className="flex items-center gap-4 w-full lg:w-auto">
-                                                <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold text-xl">
-                                                    {apt.patientId.name[0]}
+                            </div>
+                            <button onClick={() => handleStartChat(upNext)} className="w-full bg-indigo-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700 transition shadow-md">Start Consultation</button>
+                        </div>
+                    ) : (
+                        <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5 text-center">
+                            <p className="text-sm text-gray-500 font-medium">No upcoming patients today.</p>
+                        </div>
+                    )}
+
+                    {/* STATS CARDS */}
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-green-50 p-4 rounded-2xl border border-green-100">
+                            <p className="text-xs text-green-600 font-medium mb-1">Total Earnings</p>
+                            <p className="text-xl font-bold text-green-800 flex items-center"><DollarSign className="w-4 h-4"/>{stats.earnings}</p>
+                        </div>
+                        <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100">
+                            <p className="text-xs text-blue-600 font-medium mb-1">Total Patients</p>
+                            <p className="text-xl font-bold text-blue-800 flex items-center"><Users className="w-4 h-4 mr-1"/>{stats.patients}</p>
+                        </div>
+                    </div>
+
+                    {/* MINI CALENDAR */}
+                    <div>
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="font-bold text-gray-800">{currentMonth.toLocaleString('default', { month: 'long', year: 'numeric' })}</h3>
+                            <div className="flex gap-1">
+                                <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))} className="p-1 hover:bg-gray-100 rounded"><ChevronLeft className="w-4 h-4"/></button>
+                                <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))} className="p-1 hover:bg-gray-100 rounded"><ChevronRight className="w-4 h-4"/></button>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-7 text-center text-xs gap-y-2">
+                            {['S','M','T','W','T','F','S'].map(d => <span key={d} className="text-gray-400 font-bold">{d}</span>)}
+                            {calendarGrid.map((date, i) => (
+                                date ? (
+                                    <button 
+                                        key={i} 
+                                        onClick={() => setSelectedDate(date.toDateString() === selectedDate?.toDateString() ? null : date)}
+                                        className={`h-8 w-8 rounded-full flex flex-col items-center justify-center transition relative ${
+                                            selectedDate && date.toDateString() === selectedDate.toDateString() ? 'bg-indigo-600 text-white shadow-md' : 'hover:bg-gray-100 text-gray-700'
+                                        }`}
+                                    >
+                                        <span>{date.getDate()}</span>
+                                        {hasAppointmentOnDate(date) && (
+                                            <span className={`w-1 h-1 rounded-full absolute bottom-1 ${selectedDate && date.toDateString() === selectedDate.toDateString() ? 'bg-white' : 'bg-red-500'}`}></span>
+                                        )}
+                                    </button>
+                                ) : <span key={i}></span>
+                            ))}
+                        </div>
+                        {selectedDate && <button onClick={() => setSelectedDate(null)} className="mt-3 text-xs text-indigo-600 font-medium hover:underline w-full text-center">Clear Filter</button>}
+                    </div>
+                </aside>
+
+                {/* --- MAIN CONTENT AREA --- */}
+                <main className="flex-1 bg-gray-50 p-4 md:p-8 overflow-y-auto">
+                    {chatSession ? (
+                        <div className="h-full max-w-4xl mx-auto">
+                            <ChatWindow partner={chatSession.partner} onEndChat={() => setChatSession(null)} userRole="doctor" />
+                        </div>
+                    ) : (
+                        <div className="max-w-5xl mx-auto">
+                            {/* Tabs */}
+                            <div className="flex gap-6 border-b border-gray-200 mb-6">
+                                <button onClick={() => setActiveTab('upcoming')} className={`pb-3 font-semibold text-sm transition ${activeTab === 'upcoming' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}>
+                                    Upcoming Appointments <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full text-xs ml-1">{stats.pendingCount}</span>
+                                </button>
+                                <button onClick={() => setActiveTab('history')} className={`pb-3 font-semibold text-sm transition ${activeTab === 'history' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}>
+                                    Consultation History
+                                </button>
+                            </div>
+
+                            {/* Patient List */}
+                            <div className="space-y-4">
+                                {filteredAppointments.length === 0 ? (
+                                    <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-gray-300">
+                                        <div className="bg-gray-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"><Calendar className="w-8 h-8 text-gray-400" /></div>
+                                        <p className="text-gray-500 font-medium">No appointments found for this filter.</p>
+                                    </div>
+                                ) : (
+                                    filteredAppointments.map(apt => (
+                                        <div key={apt._id} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-all flex flex-col md:flex-row justify-between items-center gap-6 group">
+                                            <div className="flex items-center gap-5 w-full md:w-auto">
+                                                <div className="text-center min-w-[60px]">
+                                                    <p className="text-xs font-bold text-gray-400 uppercase">{new Date(apt.date).toLocaleString('default', { month: 'short' })}</p>
+                                                    <p className="text-2xl font-bold text-gray-800">{new Date(apt.date).getDate()}</p>
                                                 </div>
-                                                <div>
-                                                    <h3 className="font-bold text-gray-900">{apt.patientId.name}</h3>
-                                                    <div className="flex items-center text-sm text-gray-500 gap-3 mt-1">
-                                                        <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {formatDate(apt.date)}</span>
-                                                        <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {apt.timeSlot}</span>
+                                                <div className="w-px h-10 bg-gray-200 hidden md:block"></div>
+                                                <div className="flex items-center gap-4">
+                                                    <div className="w-12 h-12 bg-indigo-50 rounded-full flex items-center justify-center text-indigo-600 font-bold text-lg group-hover:bg-indigo-600 group-hover:text-white transition-colors">{apt.patientId.name[0]}</div>
+                                                    <div>
+                                                        <h3 className="font-bold text-gray-900 text-lg">{apt.patientId.name}</h3>
+                                                        <div className="flex items-center gap-3 text-sm text-gray-500">
+                                                            <span className="flex items-center gap-1"><Clock className="w-3 h-3"/> {apt.timeSlot}</span>
+                                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${apt.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{apt.paymentStatus}</span>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
-
-                                            <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-end">
-                                                {/* Payment Status Badge */}
-                                                <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${
-                                                    apt.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                                                }`}>
-                                                    {apt.paymentStatus}
-                                                </span>
-                                                
-                                                {/* Action Buttons */}
+                                            <div className="flex items-center gap-3 w-full md:w-auto justify-end">
                                                 {apt.status === 'completed' ? (
-                                                    <span className="flex items-center gap-2 px-4 py-2 bg-green-50 text-green-700 rounded-xl font-bold border border-green-200">
-                                                        <CheckCircle className="w-4 h-4" /> Completed
-                                                    </span>
+                                                    <span className="flex items-center gap-2 px-4 py-2 bg-gray-50 text-gray-600 rounded-lg text-sm font-semibold"><CheckCircle className="w-4 h-4 text-green-500" /> Completed</span>
                                                 ) : (
                                                     <>
-                                                        <button 
-                                                            onClick={() => handleStartChatFromAppointment(apt)}
-                                                            className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl font-semibold transition"
-                                                        >
-                                                            Chat
-                                                        </button>
-                                                        <button 
-                                                            onClick={() => openCompleteModal(apt)}
-                                                            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold transition shadow-lg shadow-indigo-200 flex items-center gap-2"
-                                                        >
-                                                            <FileText className="w-4 h-4" /> Complete
-                                                        </button>
+                                                        <button onClick={() => handleStartChat(apt)} className="flex-1 md:flex-none px-5 py-2.5 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition shadow-md shadow-indigo-100">Chat Now</button>
+                                                        <button onClick={() => { setSelectedAppointment(apt); setConsultationData({diagnosis: '', prescription: ''}); setShowCompleteModal(true); }} className="flex-1 md:flex-none px-5 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition">Mark Complete</button>
                                                     </>
                                                 )}
                                             </div>
                                         </div>
-                                    ))}
-                                </div>
-                            )}
+                                    ))
+                                )}
+                            </div>
                         </div>
                     )}
+                </main>
+            </div>
+
+            {/* --- 1. COMPLETION MODAL --- */}
+            {showCompleteModal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-8 animate-in zoom-in duration-200">
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><FileText className="text-indigo-600"/> Finalize Consultation</h2>
+                            <button onClick={() => setShowCompleteModal(false)} className="p-1 hover:bg-gray-100 rounded-full"><X className="w-5 h-5 text-gray-500"/></button>
+                        </div>
+                        <form onSubmit={handleComplete} className="space-y-5">
+                            <div><label className="block text-sm font-bold text-gray-700 mb-1">Diagnosis</label><input type="text" required placeholder="e.g. Viral Fever" className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" value={consultationData.diagnosis} onChange={e => setConsultationData({...consultationData, diagnosis: e.target.value})} /></div>
+                            <div><label className="block text-sm font-bold text-gray-700 mb-1">Prescription</label><textarea required rows="4" placeholder="Treatment details..." className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none resize-none" value={consultationData.prescription} onChange={e => setConsultationData({...consultationData, prescription: e.target.value})} /></div>
+                            <button type="submit" className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition">Save & Complete</button>
+                        </form>
+                    </div>
                 </div>
-            </main>
+            )}
 
-            {/* --- COMPLETION MODAL --- */}
-            {showModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-8 relative animate-in fade-in zoom-in duration-200">
-                        <button 
-                            onClick={() => setShowModal(false)}
-                            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 bg-gray-100 p-1 rounded-full"
-                        >
-                            <X className="w-5 h-5" />
-                        </button>
-
-                        <h2 className="text-2xl font-bold mb-6 text-gray-800 flex items-center gap-2">
-                            <Activity className="w-6 h-6 text-indigo-600" />
-                            Consultation Details
-                        </h2>
-                        
-                        <form onSubmit={handleCompleteAppointment} className="space-y-6">
-                            <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-2">Diagnosis</label>
-                                <input 
-                                    type="text" 
-                                    required
-                                    placeholder="e.g. Viral Fever, Hypertension"
-                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition"
-                                    value={consultationData.diagnosis}
-                                    onChange={(e) => setConsultationData({...consultationData, diagnosis: e.target.value})}
-                                />
+            {/* --- 2. EDIT PROFILE MODAL (NEW) --- */}
+            {showProfileModal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-8 animate-in zoom-in duration-200">
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><User className="text-indigo-600"/> Edit Profile</h2>
+                            <button onClick={() => setShowProfileModal(false)} className="p-1 hover:bg-gray-100 rounded-full"><X className="w-5 h-5 text-gray-500"/></button>
+                        </div>
+                        <form onSubmit={handleProfileUpdate} className="space-y-4">
+                            <div><label className="block text-sm font-bold text-gray-700 mb-1">Full Name</label><input type="text" className="w-full p-3 border rounded-lg" value={profileData.name} onChange={e => setProfileData({...profileData, name: e.target.value})} /></div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div><label className="block text-sm font-bold text-gray-700 mb-1">Specialization</label><input type="text" className="w-full p-3 border rounded-lg" value={profileData.specialization} onChange={e => setProfileData({...profileData, specialization: e.target.value})} /></div>
+                                <div><label className="block text-sm font-bold text-gray-700 mb-1">Experience (Yrs)</label><input type="text" className="w-full p-3 border rounded-lg" value={profileData.experience} onChange={e => setProfileData({...profileData, experience: e.target.value})} /></div>
                             </div>
-
-                            <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-2">Prescription & Notes</label>
-                                <textarea 
-                                    required
-                                    rows="5"
-                                    placeholder="1. Paracetamol 500mg - After food&#10;2. Drink plenty of warm water&#10;3. Rest for 3 days"
-                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition resize-none"
-                                    value={consultationData.prescription}
-                                    onChange={(e) => setConsultationData({...consultationData, prescription: e.target.value})}
-                                />
-                            </div>
-
-                            <button 
-                                type="submit" 
-                                className="w-full bg-indigo-600 text-white py-3 rounded-lg font-bold text-lg hover:bg-indigo-700 transition flex items-center justify-center gap-2 shadow-lg shadow-indigo-200"
-                            >
-                                <CheckCircle className="w-5 h-5" /> Save & Complete
-                            </button>
+                            <div><label className="block text-sm font-bold text-gray-700 mb-1">Clinic Address (Location)</label><input type="text" placeholder="e.g. 123 Health St, New York" className="w-full p-3 border rounded-lg" value={profileData.address} onChange={e => setProfileData({...profileData, address: e.target.value})} /></div>
+                            <div><label className="block text-sm font-bold text-gray-700 mb-1">Consultation Fees ($)</label><input type="number" className="w-full p-3 border rounded-lg" value={profileData.fees} onChange={e => setProfileData({...profileData, fees: e.target.value})} /></div>
+                            <button type="submit" className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition flex items-center justify-center gap-2"><Save className="w-4 h-4"/> Save Profile</button>
                         </form>
                     </div>
                 </div>

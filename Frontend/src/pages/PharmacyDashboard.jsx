@@ -4,7 +4,8 @@ import axios from 'axios';
 import { 
     Pill, LogOut, Package, Plus, Edit, Trash2, AlertTriangle, 
     Search, X, Save, Loader2, Calendar, DollarSign, RefreshCw,
-    ClipboardList, CheckCircle, Clock, MapPin
+    ClipboardList, CheckCircle, Clock, MapPin, FileText, User, 
+    Truck // --- NEW: Added Truck Icon
 } from 'lucide-react';
 
 const PharmacyDashboard = () => {
@@ -27,6 +28,11 @@ const PharmacyDashboard = () => {
     const [showEditModal, setShowEditModal] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [selectedMedicine, setSelectedMedicine] = useState(null);
+    
+    // Prescription Modal State
+    const [showPrescriptionModal, setShowPrescriptionModal] = useState(false);
+    const [selectedOrder, setSelectedOrder] = useState(null);
+
     const [formData, setFormData] = useState({
         medicineName: '',
         stock: '',
@@ -34,80 +40,56 @@ const PharmacyDashboard = () => {
         expiryDate: ''
     });
 
-    // Authentication Token
     const token = localStorage.getItem('token');
-
-    // Base URL (Adjust if your backend runs on a different port)
     const API_URL = 'http://localhost:5000/api/pharmacy';
 
     useEffect(() => {
         if (!token) {
-            navigate('/login'); // Redirect if no token
+            navigate('/pharmacy/login');
         } else {
             fetchMedicines();
             fetchOrders();
         }
     }, [token]);
 
-    // --- API FUNCTIONS (Direct Implementation) ---
+    // --- API FUNCTIONS ---
 
-    // 1. Fetch Inventory
     const fetchMedicines = async () => {
         try {
             setLoading(true);
-            const res = await axios.get(`${API_URL}/inventory`, {
-                headers: { 'auth-token': token }
-            });
-            // Handle both array response or object wrapper
+            const res = await axios.get(`${API_URL}/inventory`, { headers: { 'auth-token': token } });
             setMedicines(Array.isArray(res.data) ? res.data : res.data.medicines || []);
         } catch (err) {
             console.error("Fetch Error:", err);
-            // Don't block UI on fetch error, just log it
         } finally {
             setLoading(false);
         }
     };
 
-    // 2. Add Medicine
     const addMedicineCall = async (data) => {
-        return await axios.post(`${API_URL}/add`, data, {
-            headers: { 'auth-token': token }
-        });
+        return await axios.post(`${API_URL}/add`, data, { headers: { 'auth-token': token } });
     };
 
-    // 3. Update Medicine
     const updateMedicineCall = async (id, data) => {
-        return await axios.put(`${API_URL}/update/${id}`, data, {
-            headers: { 'auth-token': token }
-        });
+        return await axios.put(`${API_URL}/update/${id}`, data, { headers: { 'auth-token': token } });
     };
 
-    // 4. Delete Medicine
     const deleteMedicineCall = async (id) => {
-        return await axios.delete(`${API_URL}/delete/${id}`, {
-            headers: { 'auth-token': token }
-        });
+        return await axios.delete(`${API_URL}/delete/${id}`, { headers: { 'auth-token': token } });
     };
 
-    // 5. Fetch Orders
     const fetchOrders = async () => {
         try {
-            const res = await axios.get(`${API_URL}/orders`, {
-                headers: { 'auth-token': token }
-            });
+            const res = await axios.get(`${API_URL}/orders`, { headers: { 'auth-token': token } });
             setOrders(res.data);
         } catch (err) {
             console.error("Order Fetch Error:", err);
         }
     };
 
-    // 6. Update Order Status
     const handleUpdateOrderStatus = async (orderId, status) => {
         try {
-            await axios.put(`${API_URL}/orders/${orderId}/status`, 
-                { status }, 
-                { headers: { 'auth-token': token } }
-            );
+            await axios.put(`${API_URL}/orders/${orderId}/status`, { status }, { headers: { 'auth-token': token } });
             fetchOrders(); 
         } catch (err) {
             setError('Failed to update order status');
@@ -117,8 +99,7 @@ const PharmacyDashboard = () => {
     // --- HANDLERS ---
 
     const handleLogout = () => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+        localStorage.clear();
         navigate('/');
     };
 
@@ -131,16 +112,9 @@ const PharmacyDashboard = () => {
     };
 
     const handleEditClick = (medicine) => {
-        // Ensure strictly only the owner can edit
-        // Note: We use optional chaining '?.' in case pharmacy object is empty
         if (medicine.pharmacyId && medicine.pharmacyId !== pharmacy.id) {
-             // Fallback: check names if IDs aren't populated
-             if(medicine.pharmacistName !== pharmacy.name) {
-                 setError('You can only edit your own medicines.');
-                 return;
-             }
+             if(medicine.pharmacistName !== pharmacy.name) { setError('You can only edit your own medicines.'); return; }
         }
-        
         setSelectedMedicine(medicine);
         setFormData({
             medicineName: medicine.medicineName || medicine.name || '',
@@ -160,8 +134,6 @@ const PharmacyDashboard = () => {
         e.preventDefault();
         setSubmitting(true);
         setError('');
-
-        // Prepare Payload
         const data = {
             medicineName: formData.medicineName,
             stock: parseInt(formData.stock),
@@ -175,15 +147,12 @@ const PharmacyDashboard = () => {
             } else {
                 await addMedicineCall(data);
             }
-            
-            // Success! Refresh and close
             await fetchMedicines();
             setShowAddModal(false);
             setShowEditModal(false);
         } catch (err) {
-            console.error("Submit Error:", err.response); // Log actual error
-            const msg = err.response?.data?.message || err.response?.data?.details?.[0]?.message || 'Failed to save medicine.';
-            setError(msg);
+            console.error("Submit Error:", err);
+            setError('Failed to save medicine.');
         } finally {
             setSubmitting(false);
         }
@@ -197,13 +166,13 @@ const PharmacyDashboard = () => {
             await fetchMedicines();
             setShowDeleteModal(false);
         } catch (err) {
-            setError(err.response?.data?.message || 'Failed to delete medicine');
+            setError('Failed to delete medicine');
         } finally {
             setSubmitting(false);
         }
     };
 
-    // Helpers
+    // Helper functions
     const getExpiryStatus = (expiryDate) => {
         const today = new Date();
         const expiry = new Date(expiryDate);
@@ -256,23 +225,12 @@ const PharmacyDashboard = () => {
                     </div>
                 </div>
                 
-                {/* Navigation Tabs */}
                 <div className="flex bg-gray-100 p-1 rounded-xl">
-                    <button 
-                        onClick={() => setActiveTab('inventory')}
-                        className={`px-6 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === 'inventory' ? 'bg-white text-yellow-700 shadow-md' : 'text-gray-500 hover:text-gray-700'}`}
-                    >
-                        Inventory
-                    </button>
-                    <button 
-                        onClick={() => setActiveTab('orders')}
-                        className={`px-6 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${activeTab === 'orders' ? 'bg-white text-orange-600 shadow-md' : 'text-gray-500 hover:text-gray-700'}`}
-                    >
+                    <button onClick={() => setActiveTab('inventory')} className={`px-6 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === 'inventory' ? 'bg-white text-yellow-700 shadow-md' : 'text-gray-500 hover:text-gray-700'}`}>Inventory</button>
+                    <button onClick={() => setActiveTab('orders')} className={`px-6 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${activeTab === 'orders' ? 'bg-white text-orange-600 shadow-md' : 'text-gray-500 hover:text-gray-700'}`}>
                         Orders 
                         {orders.filter(o => o.status === 'Pending').length > 0 && (
-                            <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
-                                {orders.filter(o => o.status === 'Pending').length}
-                            </span>
+                            <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">{orders.filter(o => o.status === 'Pending').length}</span>
                         )}
                     </button>
                 </div>
@@ -289,15 +247,7 @@ const PharmacyDashboard = () => {
             </header>
 
             <main className="relative z-10">
-                {error && (
-                    <div className="bg-red-50 border-2 border-red-200 text-red-800 p-4 rounded-xl mb-6 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <AlertTriangle className="w-5 h-5" />
-                            <span>{error}</span>
-                        </div>
-                        <button onClick={() => setError('')} className="text-red-600 hover:text-red-800"><X className="w-5 h-5" /></button>
-                    </div>
-                )}
+                {error && <div className="bg-red-50 border-2 border-red-200 text-red-800 p-4 rounded-xl mb-6 flex items-center justify-between"><div className="flex items-center gap-2"><AlertTriangle className="w-5 h-5"/><span>{error}</span></div><button onClick={() => setError('')} className="text-red-600 hover:text-red-800"><X className="w-5 h-5"/></button></div>}
 
                 {/* --- VIEW: INVENTORY --- */}
                 {activeTab === 'inventory' && (
@@ -332,8 +282,7 @@ const PharmacyDashboard = () => {
                                 <div className="flex gap-3">
                                     <div className="relative">
                                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                                        <input type="text" placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-                                            className="pl-10 pr-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-yellow-500 focus:border-yellow-500" />
+                                        <input type="text" placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10 pr-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-yellow-500 focus:border-yellow-500" />
                                     </div>
                                     <button onClick={handleAddClick} className="px-6 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition flex items-center gap-2 font-semibold">
                                         <Plus className="w-4 h-4" /> Add
@@ -341,7 +290,6 @@ const PharmacyDashboard = () => {
                                 </div>
                             </div>
 
-                            {/* Table Content */}
                             <div className="overflow-x-auto">
                                 <table className="w-full">
                                     <thead>
@@ -355,9 +303,7 @@ const PharmacyDashboard = () => {
                                     </thead>
                                     <tbody>
                                         {filteredMedicines.map((medicine) => {
-                                            // Robust ownership check (checks both ID and Name to be safe)
                                             const isOwn = (medicine.pharmacyId === pharmacy.id) || (medicine.pharmacistName === pharmacy.name);
-                                            
                                             return (
                                                 <tr key={medicine._id} className="border-b border-gray-100 hover:bg-gray-50">
                                                     <td className="py-4 px-4 font-medium">
@@ -403,14 +349,35 @@ const PharmacyDashboard = () => {
                                     <div key={order._id} className="bg-white border border-gray-200 p-4 rounded-xl shadow-sm hover:shadow-md transition-shadow flex flex-col md:flex-row justify-between items-center gap-4">
                                         <div className="flex items-start gap-4 w-full">
                                             <div className="p-3 bg-blue-50 rounded-full text-blue-600 font-bold text-lg">
-                                                {order.patientId?.name?.charAt(0) || 'P'}
+                                                <User className="w-6 h-6" />
                                             </div>
                                             <div>
                                                 <h3 className="font-bold text-gray-800 text-lg">{order.medicineName}</h3>
-                                                <div className="flex items-center gap-4 text-sm text-gray-500 mt-1">
+                                                <div className="flex items-center gap-4 text-sm text-gray-500 mt-1 mb-2">
                                                     <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> Patient: {order.patientId?.name || 'Unknown'}</span>
                                                     <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {new Date(order.orderDate).toLocaleDateString()}</span>
                                                 </div>
+
+                                                {/* --- NEW: DELIVERY ADDRESS BADGE --- */}
+                                                {order.fulfillmentType === 'Delivery' && (
+                                                    <div className="bg-orange-50 text-orange-800 p-2 rounded-lg border border-orange-100 flex items-start gap-2 max-w-sm">
+                                                        <Truck className="w-5 h-5 mt-0.5 shrink-0" />
+                                                        <div>
+                                                            <span className="font-bold text-xs uppercase block">Deliver To:</span>
+                                                            <span className="text-sm">{order.deliveryAddress || 'Address not provided'}</span>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Prescription Button */}
+                                                {order.prescription && order.prescription !== 'No prescription attached' && (
+                                                    <button 
+                                                        onClick={() => { setSelectedOrder(order); setShowPrescriptionModal(true); }}
+                                                        className="mt-2 text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded border border-blue-200 flex items-center gap-1 hover:bg-blue-100 transition"
+                                                    >
+                                                        <FileText className="w-3 h-3" /> View Prescription
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
 
@@ -421,10 +388,7 @@ const PharmacyDashboard = () => {
                                             </div>
                                             
                                             {order.status === 'Pending' && (
-                                                <button 
-                                                    onClick={() => handleUpdateOrderStatus(order._id, 'Ready')}
-                                                    className="px-6 py-2 bg-orange-500 text-white rounded-lg font-semibold hover:bg-orange-600 transition flex items-center gap-2"
-                                                >
+                                                <button onClick={() => handleUpdateOrderStatus(order._id, 'Ready')} className="px-6 py-2 bg-orange-500 text-white rounded-lg font-semibold hover:bg-orange-600 transition flex items-center gap-2">
                                                     Mark Ready
                                                 </button>
                                             )}
@@ -445,7 +409,23 @@ const PharmacyDashboard = () => {
                 )}
             </main>
 
-            {/* Modals */}
+            {/* --- Prescription Viewing Modal --- */}
+            {showPrescriptionModal && selectedOrder && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 relative animate-in zoom-in duration-200">
+                        <button onClick={() => setShowPrescriptionModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X className="w-6 h-6"/></button>
+                        <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2"><FileText className="text-blue-600"/> Patient Prescription</h3>
+                        <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 text-gray-700 whitespace-pre-wrap font-mono text-sm max-h-[60vh] overflow-y-auto">
+                            {selectedOrder.prescription}
+                        </div>
+                        <div className="mt-6 flex justify-end">
+                            <button onClick={() => setShowPrescriptionModal(false)} className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-semibold">Close</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Add/Edit Modal */}
              {(showAddModal || showEditModal) && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={(e) => { if (e.target === e.currentTarget) { setShowAddModal(false); setShowEditModal(false); }}}>
                     <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
@@ -454,24 +434,12 @@ const PharmacyDashboard = () => {
                             <button onClick={() => { setShowAddModal(false); setShowEditModal(false); }}><X className="w-6 h-6 text-gray-400" /></button>
                         </div>
                         <form onSubmit={handleSubmit} className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium mb-1">Medicine Name</label>
-                                <input type="text" placeholder="e.g. Paracetamol" required value={formData.medicineName} onChange={e => setFormData({...formData, medicineName: e.target.value})} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500" />
-                            </div>
+                            <div><label className="block text-sm font-medium mb-1">Medicine Name</label><input type="text" placeholder="e.g. Paracetamol" required value={formData.medicineName} onChange={e => setFormData({...formData, medicineName: e.target.value})} className="w-full px-4 py-2 border rounded-lg" /></div>
                             <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium mb-1">Stock</label>
-                                    <input type="number" placeholder="0" required value={formData.stock} onChange={e => setFormData({...formData, stock: e.target.value})} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium mb-1">Price</label>
-                                    <input type="number" step="0.01" placeholder="0.00" required value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500" />
-                                </div>
+                                <div><label className="block text-sm font-medium mb-1">Stock</label><input type="number" placeholder="0" required value={formData.stock} onChange={e => setFormData({...formData, stock: e.target.value})} className="w-full px-4 py-2 border rounded-lg" /></div>
+                                <div><label className="block text-sm font-medium mb-1">Price</label><input type="number" step="0.01" placeholder="0.00" required value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} className="w-full px-4 py-2 border rounded-lg" /></div>
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium mb-1">Expiry Date</label>
-                                <input type="date" required value={formData.expiryDate} onChange={e => setFormData({...formData, expiryDate: e.target.value})} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500" />
-                            </div>
+                            <div><label className="block text-sm font-medium mb-1">Expiry Date</label><input type="date" required value={formData.expiryDate} onChange={e => setFormData({...formData, expiryDate: e.target.value})} className="w-full px-4 py-2 border rounded-lg" /></div>
                             <button type="submit" disabled={submitting} className="w-full py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 font-semibold">{submitting ? <Loader2 className="animate-spin mx-auto"/> : 'Save Medicine'}</button>
                         </form>
                     </div>

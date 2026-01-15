@@ -2,7 +2,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 // 🛑 FIX: Changed 'Pills' to the correct icon name, 'Pill'
-import { Stethoscope, Heart, Pill } from 'lucide-react'; 
+import { Stethoscope, Heart, Pill, Building2 } from 'lucide-react'; 
 
 const RoleCard = ({ title, description, link, icon: Icon, color }) => {
     // Determine the color classes using full strings for better JIT compatibility
@@ -99,7 +99,7 @@ const HomePage = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-7xl w-full relative z-10">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-7xl w-full relative z-10">
         <div className="animate-slideInRight" style={{ animationDelay: '0.1s' }}>
           <RoleCard 
             title="Doctor Portal"
@@ -125,6 +125,15 @@ const HomePage = () => {
             link="/pharmacy/login"
             icon={Pill} 
             color="yellow"
+          />
+        </div>
+        <div className="animate-slideInRight" style={{ animationDelay: '0.4s' }}>
+          <RoleCard 
+            title="Hospital Portal"
+            description="Register your hospital, manage details, and reach patients on the map."
+            link="/hospital/login"
+            icon={Building2} 
+            color="indigo"
           />
         </div>
       </div>

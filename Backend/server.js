@@ -42,6 +42,9 @@ const aiAssistantRoutes = require('./routes/aiAssistant');
 const appointmentRoutes = require('./routes/appointment');
 const reportAnalysisRoutes = require('./routes/reportAnalysis');
 const pharmacyRoutes = require('./routes/pharmacy');
+// Import hospital routes
+const hospitalRoutes = require('./routes/hospital');
+const hospitalAuthRoutes = require('./routes/hospitalAuth');
 
 // --- API Endpoints ---
 app.use('/api/doctor', doctorRoutes);
@@ -51,6 +54,9 @@ app.use('/api/ai', aiAssistantRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/reports', reportAnalysisRoutes);
 app.use('/api/pharmacy', pharmacyRoutes);
+// Use hospital routes
+app.use('/api/hospitals', hospitalRoutes);
+app.use('/api/hospital-auth', hospitalAuthRoutes);
 
 const userSocketMap = {}; // { userId: socketId }
 

@@ -22,6 +22,9 @@ import PharmacyDashboard from './pages/PharmacyDashboard';
 // --- NEW PAGES (Added) ---
 import MedicalHistory from './pages/MedicalHistory';
 import PharmacyCatalog from './pages/PharmacyCatalog';
+import HospitalLogin from './pages/HospitalLogin';
+import HospitalRegister from './pages/HospitalRegister';
+import HospitalDashboard from './pages/HospitalDashboard';
 
 
 const ProtectedRoute = ({ children, role }) => {
@@ -65,6 +68,11 @@ const App = () => {
                     <Route path="/pharmacy/login" element={<PharmacyLogin />} />
                     <Route path="/pharmacy/register" element={<PharmacyRegister />} />
                     <Route path="/pharmacy/dashboard" element={<ProtectedRoute role="pharmacy"><PharmacyDashboard /></ProtectedRoute>} />
+
+                    {/* Hospital Routes */}
+                    <Route path="/hospital/login" element={<HospitalLogin />} />
+                    <Route path="/hospital/register" element={<HospitalRegister />} />
+                    <Route path="/hospital/dashboard" element={<ProtectedRoute role="hospital"><HospitalDashboard /></ProtectedRoute>} />
 
                     <Route path="*" element={<h1 className='text-4xl text-center pt-20 font-bold text-red-500'>404 | Page Not Found</h1>} />
                 </Routes>

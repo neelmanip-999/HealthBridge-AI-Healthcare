@@ -1,27 +1,37 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, MapPin, Navigation, Save, Trash2, Search } from 'lucide-react';
+import { ArrowLeft, MapPin, Navigation, Save, Trash2, Search, Hospital } from 'lucide-react';
+import axios from 'axios';
+import { GoogleMap, LoadScript, Marker, DirectionsRenderer, Autocomplete } from '@react-google-maps/api';
 
-const API_KEY = "ca1da5c3-bd8e-4621-a0e3-86bcae970b08"; // GraphHopper API key
+const GOOGLE_MAPS_API_KEY = "AIzaSyD7Vw4BlccSY7Y677v599yhYC7heGWi65s";
+const LIBRARIES = ["places"];  // Define libraries as a constant outside component
 
 const MapPage = () => {
     const navigate = useNavigate();
-    const mapRef = useRef(null);
-    const mapInstance = useRef(null);
-    const userMarkerRef = useRef(null);
-    const destMarkerRef = useRef(null);
-    const routeLayerRef = useRef(null);
-    
-    const [userCoords, setUserCoords] = useState(null);
-    const [lastSearchedCoords, setLastSearchedCoords] = useState(null);
+    const [userCoords, setUserCoords] = useState({ lat: 28.6139, lng: 77.209 });
     const [destination, setDestination] = useState('');
     const [saveName, setSaveName] = useState('');
     const [routeInfo, setRouteInfo] = useState('');
     const [savedLocations, setSavedLocations] = useState([]);
-    const [showSaveSearched, setShowSaveSearched] = useState(false);
+    const [hospitals, setHospitals] = useState([]);
+    const [directions, setDirections] = useState(null);
+    const [showHospitals, setShowHospitals] = useState(true);
     const [loading, setLoading] = useState(false);
+    const [mapRef, setMapRef] = useState(null);
+    const autocompleteRef = useRef(null);
 
     const STORAGE_KEY = "my_saved_locations_v1";
+
+    // Fetch hospitals from backend
+    const fetchHospitals = async () => {
+        try {
+            const response = await axios.get('/api/hospitals/all');
+            setHospitals(response.data);
+        } catch (error) {
+            console.error('Error fetching hospitals:', error);
+        }
+    };
 
     // Load saved locations from localStorage
     useEffect(() => {
@@ -29,109 +39,56 @@ const MapPage = () => {
         setSavedLocations(saved);
     }, []);
 
-    // Initialize map
+    // Load hospitals on component mount
     useEffect(() => {
-        if (!mapRef.current || mapInstance.current) return;
-
-        // Wait for Leaflet to be available (with retry)
-        const initMap = () => {
-            if (!window.L) {
-                console.warn('Leaflet not loaded yet, retrying...');
-                setTimeout(initMap, 100);
-                return;
-            }
-
-            // Initialize Leaflet map
-            mapInstance.current = window.L.map(mapRef.current).setView([20.5937, 78.9629], 5);
-
-            window.L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-                attribution: "&copy; OpenStreetMap"
-            }).addTo(mapInstance.current);
-        };
-
-        initMap();
-
-        // Watch user's location
-        if ("geolocation" in navigator) {
-            navigator.geolocation.watchPosition(
-                (pos) => {
-                    const coords = [pos.coords.latitude, pos.coords.longitude];
-                    setUserCoords(coords);
-
-                    if (userMarkerRef.current) {
-                        mapInstance.current.removeLayer(userMarkerRef.current);
-                    }
-
-                    userMarkerRef.current = window.L.marker(coords).addTo(mapInstance.current);
-
-                    if (mapInstance.current.getZoom() < 10) {
-                        mapInstance.current.setView(coords, 14);
-                    }
-                },
-                (err) => {
-                    setRouteInfo("Location unavailable: " + err.message);
-                },
-                { enableHighAccuracy: true }
-            );
-        }
-
-        return () => {
-            if (mapInstance.current) {
-                mapInstance.current.remove();
-            }
-        };
+        fetchHospitals();
     }, []);
 
-    // Geocode function
-    const geocode = async (query) => {
-        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error("Geocoding failed");
-        return res.json();
-    };
-
-    // Find route using coordinates
-    const findRouteUsingCoords = async (dest) => {
-        if (!userCoords) {
-            alert("Waiting for your location...");
-            return;
+    // Get user's location
+    useEffect(() => {
+        if ("geolocation" in navigator) {
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    setUserCoords({
+                        lat: pos.coords.latitude,
+                        lng: pos.coords.longitude
+                    });
+                },
+                (err) => {
+                    console.error("Location unavailable: " + err.message);
+                }
+            );
         }
+    }, []);
+
+    // Find route using Google Directions API
+    const findRouteUsingCoords = async (destCoords) => {
+        if (!window.google) return;
 
         setLoading(true);
         setRouteInfo("Calculating route...");
 
-        if (destMarkerRef.current) {
-            mapInstance.current.removeLayer(destMarkerRef.current);
-        }
-        destMarkerRef.current = window.L.marker(dest)
-            .addTo(mapInstance.current)
-            .bindPopup("Destination")
-            .openPopup();
-
-        const url = `https://graphhopper.com/api/1/route?point=${userCoords[0]},${userCoords[1]}&point=${dest[0]},${dest[1]}&profile=car&points_encoded=false&calc_points=true&locale=en&key=${API_KEY}`;
+        const directionsService = new window.google.maps.DirectionsService();
 
         try {
-            const res = await fetch(url);
-            const data = await res.json();
+            const result = await directionsService.route({
+                origin: new window.google.maps.LatLng(userCoords.lat, userCoords.lng),
+                destination: new window.google.maps.LatLng(destCoords.lat, destCoords.lng),
+                travelMode: window.google.maps.TravelMode.DRIVING,
+            });
 
-            if (data.paths && data.paths.length > 0) {
-                const route = data.paths[0];
-                const coords = route.points.coordinates.map((c) => [c[1], c[0]]);
+            setDirections(result);
 
-                if (routeLayerRef.current) {
-                    mapInstance.current.removeLayer(routeLayerRef.current);
-                }
-                routeLayerRef.current = window.L.polyline(coords, { color: "blue", weight: 5 }).addTo(mapInstance.current);
-                mapInstance.current.fitBounds(routeLayerRef.current.getBounds());
-
+            if (result.routes.length > 0) {
+                const route = result.routes[0];
+                const leg = route.legs[0];
                 setRouteInfo(
-                    `Distance: ${(route.distance / 1000).toFixed(2)} km | Duration: ${(route.time / 60000).toFixed(1)} min`
+                    `Distance: ${leg.distance.text} | Duration: ${leg.duration.text}`
                 );
-            } else {
-                setRouteInfo("Error: Could not calculate route");
             }
-        } catch (e) {
-            setRouteInfo("Error: " + e.message);
+        } catch (error) {
+            console.error("Error calculating route:", error);
+            setRouteInfo("Error: Could not calculate route");
         } finally {
             setLoading(false);
         }
@@ -144,49 +101,28 @@ const MapPage = () => {
             alert("Enter destination!");
             return;
         }
-        if (!userCoords) {
-            alert("Waiting for your location...");
-            return;
-        }
 
         setLoading(true);
         setRouteInfo("Searching...");
 
         try {
-            const data = await geocode(q);
-            if (!data.length) throw new Error("Not found");
-
-            const coords = [parseFloat(data[0].lat), parseFloat(data[0].lon)];
-            setLastSearchedCoords(coords);
-            setShowSaveSearched(true);
-
-            await findRouteUsingCoords(coords);
+            if (autocompleteRef.current) {
+                const place = autocompleteRef.current.getPlace();
+                if (place && place.geometry) {
+                    const destCoords = {
+                        lat: place.geometry.location.lat(),
+                        lng: place.geometry.location.lng()
+                    };
+                    await findRouteUsingCoords(destCoords);
+                } else {
+                    setRouteInfo("Error: Location not found");
+                    setLoading(false);
+                }
+            }
         } catch (e) {
             setRouteInfo("Error: " + e.message);
             setLoading(false);
         }
-    };
-
-    // Save searched destination
-    const handleSaveSearched = () => {
-        if (!lastSearchedCoords) {
-            alert("No destination searched!");
-            return;
-        }
-
-        const name = prompt("Enter a name for this destination:", destination);
-        if (!name) return;
-
-        const arr = [...savedLocations];
-        arr.unshift({
-            name,
-            coords: lastSearchedCoords,
-            savedAt: new Date().toISOString(),
-        });
-
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
-        setSavedLocations(arr);
-        setShowSaveSearched(false);
     };
 
     // Save current location
@@ -224,58 +160,120 @@ const MapPage = () => {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 relative">
-            {/* Map Container */}
-            <div ref={mapRef} className="w-full h-screen" />
+            {/* Google Map Container */}
+            <LoadScript googleMapsApiKey={GOOGLE_MAPS_API_KEY} libraries={LIBRARIES}>
+                <GoogleMap
+                    mapContainerStyle={{ width: '100%', height: '100vh' }}
+                    center={userCoords}
+                    zoom={14}
+                    onLoad={(map) => setMapRef(map)}
+                >
+                    {/* User's Current Location Marker */}
+                    <Marker
+                        position={userCoords}
+                        title="Your Location"
+                        icon={{
+                            path: window.google?.maps?.SymbolPath?.CIRCLE || 0,
+                            scale: 10,
+                            fillColor: '#4285F4',
+                            fillOpacity: 1,
+                            strokeColor: '#ffffff',
+                            strokeWeight: 3,
+                        }}
+                    />
 
-            {/* Controls Panel */}
-            <aside className="absolute top-4 left-4 w-80 max-w-[calc(100%-32px)] bg-gray-900/90 backdrop-blur-sm text-white p-4 rounded-xl z-[1000] shadow-2xl">
-                <div className="flex items-center justify-between mb-4">
-                    <button
-                        onClick={() => navigate('/patient/dashboard')}
-                        className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-                    >
-                        <ArrowLeft className="h-5 w-5" />
-                    </button>
-                    <h2 className="text-xl font-bold flex items-center">
-                        <Navigation className="h-5 w-5 mr-2" />
-                        Route Finder
-                    </h2>
-                </div>
+                    {/* Hospital Markers */}
+                    {showHospitals && hospitals.map((hospital, idx) => (
+                        <Marker
+                            key={idx}
+                            position={{
+                                lat: hospital.location.coordinates[1],
+                                lng: hospital.location.coordinates[0],
+                            }}
+                            title={hospital.name}
+                            icon={{
+                                url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(
+                                    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32"><circle cx="16" cy="16" r="14" fill="%23ef4444" stroke="%23ffffff" stroke-width="2"/><text x="16" y="20" font-size="16" text-anchor="middle" fill="white" dominant-baseline="middle">🏥</text></svg>'
+                                ),
+                                scaledSize: new window.google.maps.Size(40, 40),
+                            }}
+                        />
+                    ))}
 
-                {/* Destination Search */}
-                <div className="mb-4">
-                    <label className="block text-xs text-gray-400 mb-2">Destination</label>
-                    <div className="flex gap-2">
-                        <div className="relative flex-1">
-                            <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                            <input
-                                id="destination"
-                                type="text"
-                                placeholder="Search destination (e.g. Taj Mahal)"
-                                value={destination}
-                                onChange={(e) => setDestination(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && handleFindRoute()}
-                                className="w-full pl-10 pr-3 py-2 rounded-lg border-none bg-white/10 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
-                        </div>
+                    {/* Saved Locations Markers */}
+                    {savedLocations.map((location, idx) => (
+                        <Marker
+                            key={`saved-${idx}`}
+                            position={{
+                                lat: location.coords.lat,
+                                lng: location.coords.lng,
+                            }}
+                            title={location.name}
+                            icon={{
+                                url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(
+                                    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32"><circle cx="16" cy="16" r="14" fill="%2322c55e" stroke="%23ffffff" stroke-width="2"/><text x="16" y="20" font-size="16" text-anchor="middle" fill="white" dominant-baseline="middle">📍</text></svg>'
+                                ),
+                                scaledSize: new window.google.maps.Size(40, 40),
+                            }}
+                        />
+                    ))}
+
+                    {/* Directions */}
+                    {directions && <DirectionsRenderer directions={directions} />}
+                </GoogleMap>
+
+                {/* Controls Panel */}
+                <aside className="absolute top-4 left-4 w-80 max-w-[calc(100%-32px)] bg-gray-900/90 backdrop-blur-sm text-white p-4 rounded-xl z-[1000] shadow-2xl max-h-[calc(100vh-32px)] overflow-y-auto">
+                    <div className="flex items-center justify-between mb-4">
                         <button
-                            onClick={handleFindRoute}
-                            disabled={loading}
-                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            onClick={() => navigate('/patient/dashboard')}
+                            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
                         >
-                            {loading ? '...' : 'Find'}
+                            <ArrowLeft className="h-5 w-5" />
                         </button>
+                        <h2 className="text-xl font-bold flex items-center">
+                            <Navigation className="h-5 w-5 mr-2" />
+                            Route Finder
+                        </h2>
                     </div>
-                    {showSaveSearched && (
-                        <button
-                            onClick={handleSaveSearched}
-                            className="mt-2 w-full px-3 py-2 bg-green-600 hover:bg-green-700 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
-                        >
-                            <Save className="h-4 w-4" />
-                            Save This Destination
-                        </button>
-                    )}
-                </div>
+
+                    {/* Destination Search */}
+                    <div className="mb-4">
+                        <label className="block text-xs text-gray-400 mb-2">Destination</label>
+                        <div className="flex gap-2">
+                            <div className="relative flex-1">
+                                <Autocomplete
+                                    onLoad={(autocomplete) => {
+                                        autocompleteRef.current = autocomplete;
+                                    }}
+                                    onPlaceChanged={() => {
+                                        if (autocompleteRef.current) {
+                                            const place = autocompleteRef.current.getPlace();
+                                            if (place && place.formatted_address) {
+                                                setDestination(place.formatted_address);
+                                            }
+                                        }
+                                    }}
+                                >
+                                    <input
+                                        type="text"
+                                        placeholder="Search destination"
+                                        value={destination}
+                                        onChange={(e) => setDestination(e.target.value)}
+                                        onKeyDown={(e) => e.key === 'Enter' && handleFindRoute()}
+                                        className="w-full px-3 py-2 rounded-lg border-none bg-white/10 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </Autocomplete>
+                            </div>
+                            <button
+                                onClick={handleFindRoute}
+                                disabled={loading}
+                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {loading ? '...' : 'Find'}
+                            </button>
+                        </div>
+                    </div>
 
                 {/* Route Info */}
                 {routeInfo && (
@@ -283,6 +281,26 @@ const MapPage = () => {
                         {routeInfo}
                     </div>
                 )}
+
+                <hr className="border-gray-700 my-4" />
+
+                {/* Hospital Finder Toggle */}
+                <div className="mb-4">
+                    <button
+                        onClick={() => setShowHospitals(!showHospitals)}
+                        className={`w-full px-4 py-2 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 ${
+                            showHospitals
+                                ? 'bg-red-600 hover:bg-red-700 text-white'
+                                : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                        }`}
+                    >
+                        <Hospital className="h-4 w-4" />
+                        {showHospitals ? 'Hide' : 'Show'} Registered Hospitals ({hospitals.length})
+                    </button>
+                    {hospitals.length === 0 && (
+                        <p className="text-xs text-gray-400 mt-2 text-center">No hospitals registered yet</p>
+                    )}
+                </div>
 
                 <hr className="border-gray-700 my-4" />
 
@@ -370,7 +388,8 @@ const MapPage = () => {
                 <p className="text-xs text-gray-400 mt-4">
                     Tip: Click a saved location to create a route to it.
                 </p>
-            </aside>
+                </aside>
+            </LoadScript>
         </div>
     );
 };

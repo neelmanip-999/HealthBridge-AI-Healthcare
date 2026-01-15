@@ -59,7 +59,22 @@ const ChatWindow = ({ partner, onEndChat, userRole }) => {
                 (message.senderId === partner._id && message.receiverId === currentUserId);
 
             if (participantsMatch) {
-                setMessages((prev) => [...prev, message]);
+                // --- FIX STARTS HERE: DEDUPLICATION LOGIC ---
+                setMessages((prev) => {
+                    // Check if this exact message already exists in state
+                    const isDuplicate = prev.some(m => 
+                        m.timestamp === message.timestamp && 
+                        String(m.senderId) === String(message.senderId) &&
+                        m.message === message.message
+                    );
+
+                    // If it exists, do not add it again
+                    if (isDuplicate) return prev;
+
+                    // If new, add it
+                    return [...prev, message];
+                });
+                // --- FIX ENDS HERE ---
 
                 // Detect Incoming Video Call
                 if (message.attachmentType === 'video_call' && String(message.senderId) !== String(currentUserId)) {
@@ -89,7 +104,6 @@ const ChatWindow = ({ partner, onEndChat, userRole }) => {
         formData.append('file', file);
 
         try {
-            // Dynamically determine the upload URL based on current location
             const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
             const uploadURL = isLocalhost ? 'http://localhost:5000/api/chat/upload' : `http://${window.location.hostname}:5000/api/chat/upload`;
             
@@ -127,7 +141,6 @@ const ChatWindow = ({ partner, onEndChat, userRole }) => {
 
     // --- VIDEO CALL LOGIC ---
     const startVideoCall = () => {
-        // Create a simpler, unique room name to avoid Jitsi collisions
         const meetingId = `HealthBridge-${Date.now()}`;
         
         const messageData = {
@@ -271,7 +284,7 @@ const ChatWindow = ({ partner, onEndChat, userRole }) => {
                 </div>
             )}
 
-            {/* --- VIDEO MODAL (UPDATED WITH NAMES) --- */}
+            {/* --- VIDEO MODAL --- */}
             {showVideoModal && videoRoomId && (
                 <div className="absolute inset-0 z-50 bg-black flex flex-col">
                     <div className="flex justify-between items-center p-4 bg-gray-900 text-white">
@@ -279,7 +292,6 @@ const ChatWindow = ({ partner, onEndChat, userRole }) => {
                             <span className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></span>
                             Live Consultation
                         </span>
-                        {/* INSTRUCTION BANNER FOR DOCTOR */}
                         {isDoctor && (
                             <div className="hidden md:block text-xs bg-yellow-600 text-black px-2 py-1 rounded font-bold">
                                 Doctor: Please "Log in" below to start the room.
@@ -288,7 +300,6 @@ const ChatWindow = ({ partner, onEndChat, userRole }) => {
                         <button onClick={() => setShowVideoModal(false)} className="bg-red-600 hover:bg-red-700 text-white px-4 py-1 rounded text-sm font-bold">End Call</button>
                     </div>
                     
-                    {/* IFRAME WITH DISPLAY NAME CONFIG */}
                     <iframe 
                         allow="camera; microphone; fullscreen; display-capture; autoplay"
                         src={`https://meet.jit.si/${videoRoomId}?config.prejoinPageEnabled=false&userInfo.displayName=${encodeURIComponent(currentUser.name)}`} 

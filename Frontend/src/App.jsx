@@ -22,6 +22,7 @@ import PharmacyDashboard from './pages/PharmacyDashboard';
 // --- NEW PAGES (Added) ---
 import MedicalHistory from './pages/MedicalHistory';
 import PharmacyCatalog from './pages/PharmacyCatalog';
+import AIHealthAssistant from './pages/AIHealthAssistant'; // <--- ADDED IMPORT HERE
 import HospitalLogin from './pages/HospitalLogin';
 import HospitalRegister from './pages/HospitalRegister';
 import HospitalDashboard from './pages/HospitalDashboard';
@@ -62,9 +63,12 @@ const App = () => {
                     <Route path="/patient/map" element={<ProtectedRoute role="patient"><MapPage /></ProtectedRoute>} />
                     <Route path="/patient/chat/:doctorId" element={<ProtectedRoute role="patient"><Chat /></ProtectedRoute>} />
                     
-                    {/* --- NEW ROUTES FOR MEDICAL HISTORY & PHARMACY CATALOG --- */}
+                    {/* --- NEW ROUTES FOR MEDICAL HISTORY & PHARMACY CATALOG & AI --- */}
                     <Route path="/patient/medical-history" element={<ProtectedRoute role="patient"><MedicalHistory /></ProtectedRoute>} />
                     <Route path="/patient/pharmacy-catalog" element={<ProtectedRoute role="patient"><PharmacyCatalog /></ProtectedRoute>} />
+                    
+                    {/* --- ADDED AI ASSISTANT ROUTE --- */}
+                    <Route path="/patient/ai-assistant" element={<ProtectedRoute role="patient"><AIHealthAssistant /></ProtectedRoute>} />
                     
                     {/* Pharmacy Routes */}
                     <Route path="/pharmacy/login" element={<PharmacyLogin />} />

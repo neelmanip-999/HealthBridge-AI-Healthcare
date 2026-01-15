@@ -14,7 +14,8 @@ import {
   PhoneIncoming, 
   Check,
   X,
-  Wifi
+  Wifi,
+  Brain // <--- Added Brain Icon for AI Assistant
 } from "lucide-react";
 import { getPatientAppointments, cancelAppointment } from "../services/api";
 import { useSocket } from "../context/SocketContext"; 
@@ -250,6 +251,10 @@ const PatientDashboard = () => {
           <DashboardCard title="Find a Doctor" Icon={Stethoscope} colorKey="indigo" description="View specialists, their status, and availability." onClick={() => navigate("/patient/doctors")} />
           <DashboardCard title="Medical History" Icon={HeartPulse} colorKey="red" description="Review and update your past records." onClick={() => navigate("/patient/medical-history")} />
           <DashboardCard title="Pharmacy Catalog" Icon={Pill} colorKey="yellow" description="Browse available medicines and prices." onClick={() => navigate("/patient/pharmacy-catalog")} />
+          
+          {/* --- RESTORED 6th CARD: AI HEALTH ASSISTANT --- */}
+          <DashboardCard title="AI Health Assistant" Icon={Brain} colorKey="purple" description="Get instant health answers and find nearby facilities." onClick={() => navigate("/patient/ai-assistant")} />
+          
           <DashboardCard title="Report Analysis" Icon={FileText} colorKey="green" description="AI-powered analysis of your medical reports and lab results." onClick={() => navigate("/patient/report-analysis")} />
           <DashboardCard title="Route Finder" Icon={MapPin} colorKey="teal" description="Find routes to hospitals, pharmacies, and save your locations." onClick={() => navigate("/patient/map")} />
         </div>

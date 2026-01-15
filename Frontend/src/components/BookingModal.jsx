@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
     X, 
     Calendar, 
     Clock, 
     CreditCard, 
     CheckCircle, 
-    AlertCircle 
+    AlertCircle,
+    Loader2 
 } from 'lucide-react';
-import { bookAppointment, confirmPayment } from '../services/api';
+import api, { bookAppointment, confirmPayment } from '../services/api'; // Ensure 'api' is imported for the custom GET call
 
 const BookingModal = ({ doctor, onClose }) => {
     const [step, setStep] = useState(1); // 1: Select Time, 2: Payment, 3: Success
@@ -17,8 +18,39 @@ const BookingModal = ({ doctor, onClose }) => {
     const [error, setError] = useState('');
     const [appointmentData, setAppointmentData] = useState(null); // Stores booking ID from backend
 
-    // Generate some dummy slots for the UI (In real app, fetch from backend)
-    const timeSlots = ["10:00 AM", "10:30 AM", "11:00 AM", "04:00 PM", "04:30 PM", "05:00 PM"];
+    // --- NEW: AVAILABILITY STATE ---
+    const [bookedSlots, setBookedSlots] = useState([]);
+    const [loadingSlots, setLoadingSlots] = useState(false);
+
+    // Standard Time Slots
+    const timeSlots = [
+        "09:00 AM", "10:00 AM", "11:00 AM", 
+        "12:00 PM", "02:00 PM", "03:00 PM", 
+        "04:00 PM", "05:00 PM", "06:00 PM"
+    ];
+
+    // --- 1. FETCH BOOKED SLOTS WHEN DATE CHANGES ---
+    useEffect(() => {
+        if (selectedDate && doctor._id) {
+            const fetchBookedSlots = async () => {
+                setLoadingSlots(true);
+                try {
+                    // Call the new backend route we created
+                    const res = await api.get('/appointments/booked-slots', {
+                        params: { doctorId: doctor._id, date: selectedDate }
+                    });
+                    setBookedSlots(res.data); // Expecting array e.g., ["10:00 AM", "02:00 PM"]
+                } catch (err) {
+                    console.error("Error fetching slots", err);
+                } finally {
+                    setLoadingSlots(false);
+                }
+            };
+            fetchBookedSlots();
+        } else {
+            setBookedSlots([]); // Reset if no date
+        }
+    }, [selectedDate, doctor._id]);
 
     // STEP 1: Create Initial Appointment (Pending Payment)
     const handleProceedToPay = async () => {
@@ -108,7 +140,10 @@ const BookingModal = ({ doctor, onClose }) => {
                                     type="date" 
                                     className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none"
                                     min={new Date().toISOString().split('T')[0]}
-                                    onChange={(e) => setSelectedDate(e.target.value)}
+                                    onChange={(e) => {
+                                        setSelectedDate(e.target.value);
+                                        setSelectedTime(''); // Reset time if date changes
+                                    }}
                                 />
                             </div>
 
@@ -117,22 +152,44 @@ const BookingModal = ({ doctor, onClose }) => {
                                 <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
                                     <Clock className="h-4 w-4 text-green-600" />
                                     Select Time Slot
+                                    {loadingSlots && <Loader2 className="h-3 w-3 animate-spin ml-2 text-green-500"/>}
                                 </label>
-                                <div className="grid grid-cols-3 gap-3">
-                                    {timeSlots.map((slot) => (
-                                        <button
-                                            key={slot}
-                                            onClick={() => setSelectedTime(slot)}
-                                            className={`py-2 px-3 text-sm rounded-lg border transition-all ${
-                                                selectedTime === slot 
-                                                ? 'bg-green-600 text-white border-green-600 shadow-md' 
-                                                : 'border-gray-200 text-gray-600 hover:border-green-400 hover:bg-green-50'
-                                            }`}
-                                        >
-                                            {slot}
-                                        </button>
-                                    ))}
-                                </div>
+                                
+                                {!selectedDate ? (
+                                    <p className="text-sm text-gray-400 italic">Please select a date first to check availability.</p>
+                                ) : (
+                                    <div className="grid grid-cols-3 gap-3">
+                                        {timeSlots.map((slot) => {
+                                            // --- LOCK LOGIC ---
+                                            const isTaken = bookedSlots.includes(slot);
+                                            const isSelected = selectedTime === slot;
+
+                                            return (
+                                                <button
+                                                    key={slot}
+                                                    disabled={isTaken} // Disable logic
+                                                    onClick={() => setSelectedTime(slot)}
+                                                    className={`
+                                                        py-2 px-3 text-sm rounded-lg border transition-all
+                                                        ${isTaken 
+                                                            ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed line-through opacity-60' // Taken Style
+                                                            : isSelected 
+                                                                ? 'bg-green-600 text-white border-green-600 shadow-md transform scale-105' // Selected Style
+                                                                : 'border-gray-200 text-gray-600 hover:border-green-400 hover:bg-green-50' // Default Style
+                                                        }
+                                                    `}
+                                                >
+                                                    {slot}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                                {selectedDate && bookedSlots.length > 0 && (
+                                    <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                                        <AlertCircle className="w-3 h-3"/> Some slots are already booked.
+                                    </p>
+                                )}
                             </div>
 
                             {/* Footer Price */}
@@ -143,8 +200,8 @@ const BookingModal = ({ doctor, onClose }) => {
                                 </div>
                                 <button 
                                     onClick={handleProceedToPay}
-                                    disabled={loading}
-                                    className="bg-gray-900 text-white py-3 px-6 rounded-xl font-semibold hover:bg-black transition-all disabled:opacity-50"
+                                    disabled={loading || !selectedTime}
+                                    className="bg-gray-900 text-white py-3 px-6 rounded-xl font-semibold hover:bg-black transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {loading ? 'Processing...' : 'Proceed to Pay'}
                                 </button>
@@ -154,7 +211,7 @@ const BookingModal = ({ doctor, onClose }) => {
 
                     {/* --- STEP 2: PAYMENT SUMMARY --- */}
                     {step === 2 && (
-                        <div className="space-y-6 text-center">
+                        <div className="space-y-6 text-center animate-in slide-in-from-right-8 fade-in duration-300">
                             <div className="bg-green-50 p-6 rounded-2xl border border-green-100">
                                 <h3 className="text-gray-900 font-bold text-lg mb-1">Confirm Booking</h3>
                                 <p className="text-gray-500 text-sm">Review your appointment details</p>
@@ -194,12 +251,16 @@ const BookingModal = ({ doctor, onClose }) => {
                                     </>
                                 )}
                             </button>
+                            
+                            <button onClick={() => setStep(1)} className="text-sm text-gray-500 hover:text-gray-800 underline">
+                                Back to Selection
+                            </button>
                         </div>
                     )}
 
                     {/* --- STEP 3: SUCCESS --- */}
                     {step === 3 && (
-                        <div className="text-center py-8">
+                        <div className="text-center py-8 animate-in zoom-in duration-300">
                             <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 animate-bounce">
                                 <CheckCircle className="h-10 w-10 text-green-600" />
                             </div>

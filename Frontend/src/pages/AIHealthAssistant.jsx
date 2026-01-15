@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Brain, Send, MapPin, Hospital, Pill as PillIcon, ArrowLeft, Loader2 } from "lucide-react";
-import axios from 'axios'; // Using Axios for cleaner API calls
+// FIX: Replaced 'Hospital' with 'Building2' to fix the import error
+import { Brain, Send, MapPin, Building2, Pill as PillIcon, ArrowLeft, Loader2 } from "lucide-react";
+import axios from 'axios'; 
 
 const AIHealthAssistant = () => {
     const navigate = useNavigate();
-    const [prompt, setPrompt] = useState(""); // Changed state name for clarity
+    const [prompt, setPrompt] = useState(""); 
     const [messages, setMessages] = useState([]);
     const [loading, setLoading] = useState(false);
     const [mapLoading, setMapLoading] = useState(false);
@@ -26,7 +27,7 @@ const AIHealthAssistant = () => {
 
         const userMessage = { role: "user", content: prompt };
         setMessages(prev => [...prev, userMessage]);
-        setPrompt(""); // Clear input after sending
+        setPrompt(""); 
         setLoading(true);
 
         try {
@@ -34,7 +35,6 @@ const AIHealthAssistant = () => {
             const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
             const apiBaseURL = isLocalhost ? 'http://localhost:5000/api' : `http://${window.location.hostname}:5000/api`;
             
-            // Make API call with full URL
             const response = await axios.post(`${apiBaseURL}/ai/ask`, 
                 { prompt: userMessage.content },
                 { headers: { 'auth-token': token } }
@@ -60,7 +60,6 @@ const AIHealthAssistant = () => {
         }
     };
 
-    // --- Google Maps and other functions remain unchanged ---
     const findNearbyPlaces = async (type) => {
         setMapLoading(true);
         
@@ -334,7 +333,8 @@ const AIHealthAssistant = () => {
                                     disabled={mapLoading}
                                     className="w-full flex items-center justify-center space-x-3 px-6 py-4 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-2xl hover:from-red-600 hover:to-red-700 transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    {mapLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : <Hospital className="h-6 w-6" />}
+                                    {/* FIX: USING BUILDING2 INSTEAD OF HOSPITAL */}
+                                    {mapLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : <Building2 className="h-6 w-6" />}
                                     <span className="font-semibold">Find Hospitals</span>
                                 </button>
 

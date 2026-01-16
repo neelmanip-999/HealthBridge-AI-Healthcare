@@ -170,7 +170,7 @@ const MapPage = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 relative">
+        <div className="min-h-screen bg-linear-to-br from-blue-50 via-indigo-50 to-purple-50 relative">
             {/* Google Map Container */}
             <LoadScript googleMapsApiKey={GOOGLE_MAPS_API_KEY} libraries={LIBRARIES}>
                 <GoogleMap
@@ -384,7 +384,7 @@ const MapPage = () => {
                                 </h4>
                                 <div className="max-h-56 overflow-y-auto space-y-2">
                                     {selectedHospital.pricing.map((item, idx) => (
-                                        <div key={idx} className="bg-gradient-to-r from-blue-900/40 to-indigo-900/40 p-3 rounded-lg border border-blue-700/30 text-xs">
+                                        <div key={idx} className="bg-linear-to-r from-blue-900/40 to-indigo-900/40 p-3 rounded-lg border border-blue-700/30 text-xs">
                                             <div className="flex justify-between items-start mb-1">
                                                 <div className="flex-1">
                                                     <div className="font-semibold text-white text-sm">{item.name}</div>

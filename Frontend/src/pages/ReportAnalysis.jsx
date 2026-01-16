@@ -586,7 +586,7 @@ const ReportAnalysis = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 py-8 px-4">
+    <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50 to-indigo-50 py-8 px-4">
       <div className="max-w-7xl mx-auto">
         {/* Enhanced Header */}
         <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 p-8 mb-6">
@@ -599,11 +599,11 @@ const ReportAnalysis = () => {
                 <ArrowLeft className="w-6 h-6 text-indigo-600" />
               </button>
               <div className="flex items-center gap-3">
-                <div className="p-3 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl shadow-lg">
+                <div className="p-3 bg-linear-to-br from-indigo-500 to-purple-600 rounded-xl shadow-lg">
                   <Brain className="w-8 h-8 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                  <h1 className="text-3xl font-bold bg-linear-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
                     AI Report Analysis
                   </h1>
                   <p className="text-gray-600 mt-1 flex items-center gap-2">
@@ -619,8 +619,8 @@ const ReportAnalysis = () => {
           {mlServiceStatus && (
             <div className={`mt-6 p-4 rounded-xl flex items-center justify-between border-2 transition-all ${
               mlServiceStatus.success && mlServiceStatus.mlService?.model_loaded
-                ? 'bg-gradient-to-r from-green-50 to-emerald-50 text-green-800 border-green-200 shadow-sm'
-                : 'bg-gradient-to-r from-yellow-50 to-amber-50 text-yellow-800 border-yellow-200 shadow-sm'
+                ? 'bg-linear-to-r from-green-50 to-emerald-50 text-green-800 border-green-200 shadow-sm'
+                : 'bg-linear-to-r from-yellow-50 to-amber-50 text-yellow-800 border-yellow-200 shadow-sm'
             }`}>
               <div className="flex items-center gap-3">
                 {mlServiceStatus.success && mlServiceStatus.mlService?.model_loaded ? (
@@ -674,7 +674,7 @@ const ReportAnalysis = () => {
 
             <div className="space-y-6 max-h-[650px] overflow-y-auto pr-2 custom-scrollbar">
               {fieldGroups.map((group, groupIdx) => (
-                <div key={groupIdx} className="border border-gray-200 rounded-xl p-5 bg-gradient-to-br from-gray-50 to-white">
+                <div key={groupIdx} className="border border-gray-200 rounded-xl p-5 bg-linear-to-br from-gray-50 to-white">
                   <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-200">
                     <group.icon className="w-5 h-5 text-indigo-600" />
                     <h3 className="font-semibold text-gray-800">{group.title}</h3>
@@ -784,7 +784,7 @@ const ReportAnalysis = () => {
               <button
                 onClick={handleAnalyze}
                 disabled={loading || Object.keys(reportData).length === 0 || Object.keys(inputErrors).length > 0}
-                className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-3.5 rounded-xl font-semibold hover:from-indigo-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-[1.02]"
+                className="flex-1 bg-linear-to-r from-indigo-600 to-purple-600 text-white px-6 py-3.5 rounded-xl font-semibold hover:from-indigo-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-[1.02]"
               >
                 {loading ? (
                   <>
@@ -849,7 +849,7 @@ const ReportAnalysis = () => {
                     </div>
                     <div className="w-full bg-white/60 rounded-full h-4 overflow-hidden">
                       <div
-                        className="h-full rounded-full transition-all duration-1000 bg-gradient-to-r from-indigo-500 to-purple-500 shadow-sm"
+                        className="h-full rounded-full transition-all duration-1000 bg-linear-to-r from-indigo-500 to-purple-500 shadow-sm"
                         style={{ width: `${analysisResult.analysis.confidence * 100}%` }}
                       />
                     </div>
@@ -880,8 +880,8 @@ const ReportAnalysis = () => {
                               <div
                                 className={`h-full rounded-full transition-all duration-700 ${
                                   idx === 0 
-                                    ? 'bg-gradient-to-r from-indigo-500 to-purple-500' 
-                                    : 'bg-gradient-to-r from-gray-400 to-gray-500'
+                                    ? 'bg-linear-to-r from-indigo-500 to-purple-500' 
+                                    : 'bg-linear-to-r from-gray-400 to-gray-500'
                                 }`}
                                 style={{ width: `${prob * 100}%` }}
                               />
@@ -894,7 +894,7 @@ const ReportAnalysis = () => {
 
                 {/* Key Health Factors - Collapsible */}
                 {analysisResult.analysis.modelInfo?.featureImportance && (
-                  <div className="bg-gradient-to-br from-emerald-50 to-green-50 rounded-xl border-2 border-emerald-200 overflow-hidden">
+                  <div className="bg-linear-to-br from-emerald-50 to-green-50 rounded-xl border-2 border-emerald-200 overflow-hidden">
                     <button
                       onClick={() => setShowFeatureImportance(!showFeatureImportance)}
                       className="w-full flex items-center justify-between p-5 hover:bg-emerald-100/50 transition"
@@ -921,7 +921,7 @@ const ReportAnalysis = () => {
                             <div key={feature} className="bg-white rounded-lg p-4 border border-emerald-100 hover:border-emerald-300 transition">
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center text-white text-sm font-bold">
+                                  <div className="w-8 h-8 rounded-full bg-linear-to-br from-emerald-500 to-green-600 flex items-center justify-center text-white text-sm font-bold">
                                     {idx + 1}
                                   </div>
                                   <span className="text-sm font-semibold text-gray-800">{feature}</span>
@@ -972,7 +972,7 @@ const ReportAnalysis = () => {
                 {/* Export Button */}
                 <button
                   onClick={exportResultsAsPDF}
-                  className="w-full mt-4 px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 rounded-xl flex items-center justify-center gap-2 text-sm font-semibold text-white transition-all shadow-sm hover:shadow"
+                  className="w-full mt-4 px-4 py-3 bg-linear-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 rounded-xl flex items-center justify-center gap-2 text-sm font-semibold text-white transition-all shadow-sm hover:shadow"
                 >
                   <FileDown className="w-4 h-4" />
                   Export Report as PDF
@@ -980,7 +980,7 @@ const ReportAnalysis = () => {
               </div>
             ) : (
               <div className="text-center py-16 text-gray-400">
-                <div className="p-4 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl w-20 h-20 mx-auto mb-4 flex items-center justify-center">
+                <div className="p-4 bg-linear-to-br from-indigo-50 to-purple-50 rounded-2xl w-20 h-20 mx-auto mb-4 flex items-center justify-center">
                   <Brain className="w-10 h-10 text-indigo-400 opacity-50" />
                 </div>
                 <p className="font-medium">Ready for Analysis</p>

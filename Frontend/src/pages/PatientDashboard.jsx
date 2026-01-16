@@ -186,7 +186,7 @@ const DashboardCard = ({ title, Icon, colorKey, description, onClick }) => {
 
   return (
     <button onClick={onClick} className="group w-full text-left bg-white p-5 rounded-2xl shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300 relative overflow-hidden flex flex-col justify-between h-40">
-      <div className={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-transparent to-gray-50 rounded-bl-full transition-transform group-hover:scale-110`}></div>
+      <div className={`absolute top-0 right-0 w-24 h-24 bg-linear-to-br from-transparent to-gray-50 rounded-bl-full transition-transform group-hover:scale-110`}></div>
       <div className={`inline-flex items-center justify-center w-12 h-12 rounded-xl ${c.split(' ')[0]} ${c.split(' ')[1]} mb-3 group-hover:scale-110 transition-transform`}>
         <Icon className="w-6 h-6" />
       </div>
@@ -261,7 +261,7 @@ const PatientDashboard = () => {
     <div className="min-h-screen bg-gray-50/50 p-4 md:p-8 font-sans text-gray-900 relative">
       
       {/* FLOATING AI BUTTON */}
-      <button onClick={() => navigate("/patient/ai-assistant")} className="fixed bottom-8 right-8 z-40 bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-4 rounded-full shadow-2xl hover:scale-110 transition-transform">
+      <button onClick={() => navigate("/patient/ai-assistant")} className="fixed bottom-8 right-8 z-40 bg-linear-to-r from-purple-600 to-indigo-600 text-white p-4 rounded-full shadow-2xl hover:scale-110 transition-transform">
         <Brain className="w-6 h-6 animate-pulse" />
       </button>
 
@@ -281,7 +281,7 @@ const PatientDashboard = () => {
       )}
 
       {/* TOP HEADER */}
-      <header className="flex flex-col md:flex-row justify-between items-end bg-gradient-to-r from-gray-900 to-gray-800 text-white p-8 rounded-3xl shadow-xl relative overflow-hidden mb-8">
+      <header className="flex flex-col md:flex-row justify-between items-end bg-linear-to-r from-gray-900 to-gray-800 text-white p-8 rounded-3xl shadow-xl relative overflow-hidden mb-8">
         <div className="absolute top-0 right-0 p-4 opacity-10"><HeartPulse className="w-64 h-64" /></div>
         <div className="relative z-10">
             <p className="text-gray-400 font-medium mb-1">Welcome back,</p>

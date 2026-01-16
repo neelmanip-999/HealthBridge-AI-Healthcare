@@ -124,14 +124,14 @@ const HospitalDashboard = () => {
 
     if (loading && !hospital) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
+            <div className="min-h-screen bg-linear-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
                 <div className="text-gray-600">Loading...</div>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-6">
+        <div className="min-h-screen bg-linear-to-br from-blue-50 via-indigo-50 to-purple-50 p-6">
             <div className="max-w-4xl mx-auto">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-8">
@@ -402,7 +402,7 @@ const HospitalDashboard = () => {
                     <div className="space-y-3">
                         {hospital?.pricing && hospital.pricing.length > 0 ? (
                             hospital.pricing.map((item, idx) => (
-                                <div key={idx} className="flex items-start justify-between p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+                                <div key={idx} className="flex items-start justify-between p-4 bg-linear-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
                                     <div className="flex-1">
                                         <div className="flex items-center gap-2 mb-1">
                                             <span className="px-3 py-1 bg-blue-600 text-white text-xs rounded-full font-semibold">

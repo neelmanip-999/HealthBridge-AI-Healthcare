@@ -22,7 +22,7 @@ const RoleCard = ({ title, description, icon: Icon, color }) => {
                 boxShadow: `inset 0 0 0 2px var(--glow-color), 0 0 20px var(--glow-color)`
             }}></div>
             {/* Background gradient overlay */}
-            <div className={`absolute inset-0 bg-gradient-to-br from-${baseColor}-50/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500`}></div>
+            <div className={`absolute inset-0 bg-linear-to-br from-${baseColor}-50/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500`}></div>
             
             {/* Icon container */}
             <div className={`inline-flex items-center justify-center w-14 h-14 ${iconBgColor} ${iconBgHoverColor} rounded-2xl mb-5 transition-all duration-300 group-hover:scale-110`}>
@@ -48,7 +48,7 @@ const HomePage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex flex-col items-center justify-center p-6 relative overflow-hidden">
+    <div className="min-h-screen bg-linear-to-br from-blue-50 via-indigo-50 to-purple-50 flex flex-col items-center justify-center p-6 relative overflow-hidden">
       {/* Background decorative elements */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-indigo-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse"></div>
@@ -124,7 +124,7 @@ const HomePage = () => {
           <button 
             onClick={handleLoginClick}
             type="button" 
-            className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-700 hover:via-purple-700 hover:to-pink-700 text-white font-bold py-4 px-12 rounded-2xl transition-all duration-300 shadow-2xl hover:shadow-3xl transform hover:scale-105 flex items-center space-x-3 text-lg cursor-pointer z-20 relative"
+            className="bg-linear-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-700 hover:via-purple-700 hover:to-pink-700 text-white font-bold py-4 px-12 rounded-2xl transition-all duration-300 shadow-2xl hover:shadow-3xl transform hover:scale-105 flex items-center space-x-3 text-lg cursor-pointer z-20 relative"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />

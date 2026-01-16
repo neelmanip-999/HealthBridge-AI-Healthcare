@@ -158,7 +158,7 @@ const MedicalHistory = () => {
                                                 
                                                 <button 
                                                     onClick={() => handleAISummary(record)}
-                                                    className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-lg text-xs font-bold hover:shadow-lg hover:scale-105 transition transform"
+                                                    className="flex items-center gap-2 px-3 py-1.5 bg-linear-to-r from-purple-500 to-indigo-600 text-white rounded-lg text-xs font-bold hover:shadow-lg hover:scale-105 transition transform"
                                                 >
                                                     <Brain className="w-3 h-3" /> AI Summary
                                                 </button>
@@ -198,7 +198,7 @@ const MedicalHistory = () => {
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[85vh]">
                         {/* Modal Header */}
-                        <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-6 flex justify-between items-center text-white shrink-0">
+                        <div className="bg-linear-to-r from-purple-600 to-indigo-600 p-6 flex justify-between items-center text-white shrink-0">
                             <div className="flex items-center gap-3">
                                 <div className="bg-white/20 p-2 rounded-lg backdrop-blur-sm">
                                     <Brain className="w-6 h-6 text-white" />

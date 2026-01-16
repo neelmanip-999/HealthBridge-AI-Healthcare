@@ -102,7 +102,7 @@ const UnifiedLogin = () => {
   };
 
   return (
-    <div className={`min-h-screen bg-gradient-to-br ${currentType.bgGradient} flex items-center justify-center p-4 relative overflow-hidden transition-all duration-500`}>
+    <div className={`min-h-screen bg-linear-to-br ${currentType.bgGradient} flex items-center justify-center p-4 relative overflow-hidden transition-all duration-500`}>
       {/* Background decorative elements */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-indigo-200 rounded-full mix-blend-multiply filter blur-xl opacity-60 animate-pulse"></div>

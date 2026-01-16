@@ -116,7 +116,7 @@ const FindDoctors = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 p-6 md:p-10 relative">
+        <div className="min-h-screen bg-linear-to-br from-green-50 via-emerald-50 to-teal-50 p-6 md:p-10 relative">
             
             {/* --- HEADER & FILTERS --- */}
             <div className="relative z-10 max-w-7xl mx-auto">
@@ -243,7 +243,7 @@ const FindDoctors = () => {
                                 {/* Action Button */}
                                 <button
                                     onClick={() => handleBookAppointment(doctor)}
-                                    className="w-full py-3 px-6 rounded-xl font-bold text-white bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 shadow-md hover:shadow-lg transition-all transform active:scale-95 flex items-center justify-center space-x-2 mt-auto"
+                                    className="w-full py-3 px-6 rounded-xl font-bold text-white bg-linear-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 shadow-md hover:shadow-lg transition-all transform active:scale-95 flex items-center justify-center space-x-2 mt-auto"
                                 >
                                     <CalendarCheck className="h-5 w-5" />
                                     <span>Book Appointment</span>

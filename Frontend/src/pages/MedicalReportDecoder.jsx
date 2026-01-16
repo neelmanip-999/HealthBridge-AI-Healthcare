@@ -39,7 +39,7 @@ const MedicalReportDecoder = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-6 md:p-10">
+        <div className="min-h-screen bg-linear-to-br from-blue-50 via-indigo-50 to-purple-50 p-6 md:p-10">
             <div className="max-w-5xl mx-auto">
                 
                 <button onClick={() => navigate('/patient/dashboard')} className="flex items-center text-gray-500 hover:text-indigo-600 mb-8 transition group">
@@ -78,7 +78,7 @@ const MedicalReportDecoder = () => {
                         <button 
                             onClick={handleAnalyze}
                             disabled={loading || !reportText}
-                            className="w-full mt-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-4 rounded-xl font-bold text-lg hover:shadow-lg hover:scale-[1.02] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                            className="w-full mt-4 bg-linear-to-r from-purple-600 to-indigo-600 text-white py-4 rounded-xl font-bold text-lg hover:shadow-lg hover:scale-[1.02] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                         >
                             {loading ? <><Loader2 className="w-6 h-6 animate-spin"/> Decoding...</> : <><Sparkles className="w-6 h-6"/> Explain This</>}
                         </button>

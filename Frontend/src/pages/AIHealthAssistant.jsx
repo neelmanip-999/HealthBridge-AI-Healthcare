@@ -160,7 +160,7 @@ const AIHealthAssistant = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 p-6 md:p-10">
+        <div className="min-h-screen bg-linear-to-br from-purple-50 via-pink-50 to-blue-50 p-6 md:p-10">
             {/* Header */}
             <header className="max-w-7xl mx-auto mb-8">
                 <div className="bg-white/80 backdrop-blur-sm p-6 shadow-2xl rounded-3xl border-t-4 border-purple-600">
@@ -182,7 +182,7 @@ const AIHealthAssistant = () => {
             <main className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Chat Section */}
                 <div className="lg:col-span-2 bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl overflow-hidden flex flex-col h-[600px]">
-                    <div className="bg-gradient-to-r from-purple-600 to-pink-600 p-6 text-white flex justify-between items-center">
+                    <div className="bg-linear-to-r from-purple-600 to-pink-600 p-6 text-white flex justify-between items-center">
                         <h2 className="text-2xl font-bold flex items-center gap-2">
                             <Sparkles className="h-5 w-5" /> Chat with AI
                         </h2>

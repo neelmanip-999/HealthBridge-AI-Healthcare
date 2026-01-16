@@ -34,7 +34,7 @@ const PatientLogin = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-blue-50 to-purple-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-linear-to-br from-indigo-50 via-blue-50 to-purple-50 flex items-center justify-center p-4">
       <div className="bg-white p-8 md:p-10 rounded-3xl shadow-2xl w-full max-w-md transform transition-all duration-500 hover:shadow-3xl">
         <div className="flex justify-center mb-6">
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center shadow-lg">

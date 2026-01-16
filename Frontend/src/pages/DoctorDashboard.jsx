@@ -236,7 +236,7 @@ const DoctorDashboard = () => {
                 {/* SIDEBAR (Profile + Cal) */}
                 <aside className="w-80 bg-white border-r border-gray-200 hidden lg:flex flex-col p-6 gap-6 overflow-y-auto shrink-0">
                     {/* Profile Card */}
-                    <div className="bg-gradient-to-br from-indigo-600 to-violet-700 rounded-2xl p-5 text-white shadow-xl shadow-indigo-100 relative overflow-hidden group shrink-0">
+                    <div className="bg-linear-to-br from-indigo-600 to-violet-700 rounded-2xl p-5 text-white shadow-xl shadow-indigo-100 relative overflow-hidden group shrink-0">
                         <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition">
                             <button onClick={() => { setProfileData(doctor); setShowProfileModal(true); }} className="bg-white/20 hover:bg-white/30 p-1.5 rounded-full backdrop-blur-sm"><Edit3 className="w-3 h-3 text-white" /></button>
                         </div>

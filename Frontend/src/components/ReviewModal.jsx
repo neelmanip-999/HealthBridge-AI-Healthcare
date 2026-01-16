@@ -51,7 +51,7 @@ const ReviewModal = ({ isOpen, onClose, doctorId, doctorName, onSuccess }) => {
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden relative">
                 
                 {/* Header */}
-                <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-6 text-white text-center relative">
+                <div className="bg-linear-to-r from-purple-600 to-indigo-600 p-6 text-white text-center relative">
                     <button 
                         onClick={onClose}
                         className="absolute top-4 right-4 p-1 hover:bg-white/20 rounded-full transition"

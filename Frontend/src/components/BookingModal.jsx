@@ -125,7 +125,7 @@ const BookingModal = ({ doctor, onClose }) => {
             <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
                 
                 {/* Header */}
-                <div className="bg-gradient-to-r from-green-600 to-teal-600 p-6 flex justify-between items-center text-white shrink-0">
+                <div className="bg-linear-to-r from-green-600 to-teal-600 p-6 flex justify-between items-center text-white shrink-0">
                     <div>
                         <h2 className="text-xl font-bold">Book Appointment</h2>
                         <p className="text-green-100 text-sm">with Dr. {doctor.name}</p>

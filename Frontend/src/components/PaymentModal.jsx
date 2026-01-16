@@ -134,7 +134,7 @@ const PaymentModal = ({ doctor, date, time, price, onClose, onConfirm }) => {
             <button 
                 onClick={handlePayment}
                 disabled={step === 'processing' || cardNumber.length < 16 || expiry.length < 5 || cvv.length < 3}
-                className="w-full py-4 bg-gradient-to-r from-gray-900 to-gray-800 hover:from-black hover:to-gray-900 text-white rounded-xl font-bold text-lg shadow-xl shadow-gray-200 transform hover:-translate-y-1 transition-all active:scale-95 disabled:opacity-50 disabled:translate-y-0 disabled:shadow-none flex items-center justify-center gap-3"
+                className="w-full py-4 bg-linear-to-r from-gray-900 to-gray-800 hover:from-black hover:to-gray-900 text-white rounded-xl font-bold text-lg shadow-xl shadow-gray-200 transform hover:-translate-y-1 transition-all active:scale-95 disabled:opacity-50 disabled:translate-y-0 disabled:shadow-none flex items-center justify-center gap-3"
             >
                 {step === 'processing' ? (
                     <>

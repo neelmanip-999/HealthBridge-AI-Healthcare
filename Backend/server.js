@@ -5,7 +5,7 @@ const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const cors = require('cors');
 const Chat = require('./models/Chat'); 
-const path = require('path'); // --- NEW: Import Path module
+const path = require('path'); 
 
 dotenv.config();
 
@@ -25,8 +25,7 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
-// --- NEW: Serve Uploads Folder Statically ---
-// This allows you to access images via http://localhost:5000/uploads/filename.jpg
+// Serve Uploads Folder Statically
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Connect to MongoDB
@@ -41,9 +40,11 @@ const chatRoutes = require('./routes/chat');
 const appointmentRoutes = require('./routes/appointment');
 const reportAnalysisRoutes = require('./routes/reportAnalysis');
 const pharmacyRoutes = require('./routes/pharmacy');
-// Import hospital routes
 const hospitalRoutes = require('./routes/hospital');
 const hospitalAuthRoutes = require('./routes/hospitalAuth');
+
+// --- NEW: Import AI Routes ---
+const aiRoutes = require('./routes/aiAssistant'); // <--- ADDED THIS
 
 // --- API Endpoints ---
 app.use('/api/doctor', doctorRoutes);
@@ -52,25 +53,24 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/reports', reportAnalysisRoutes);
 app.use('/api/pharmacy', pharmacyRoutes);
-// Use hospital routes
 app.use('/api/hospitals', hospitalRoutes);
 app.use('/api/hospital-auth', hospitalAuthRoutes);
 
+// --- NEW: Use AI Routes ---
+app.use('/api/ai', aiRoutes); // <--- ADDED THIS (Enables /api/ai/ask and /api/ai/summarize)
+
+// --- SOCKET.IO LOGIC ---
 const userSocketMap = {}; // { userId: socketId }
 
 io.on('connection', (socket) => {
-    // NOTE: This part is crucial for mapping user IDs to socket IDs
     const userId = socket.handshake.auth.userId;
     
     if (userId) {
         userSocketMap[userId] = socket.id;
         console.log(`User connected: ${userId} with socket ID: ${socket.id}`);
-        
-        // AUTOMATICALLY JOIN USER ROOM
         socket.join(userId); 
     }
 
-    // --- ROOM LOGIC ---
     socket.on('join_room', (room) => {
         socket.join(room);
         console.log(`User ${socket.id} joined room: ${room}`);
@@ -78,7 +78,6 @@ io.on('connection', (socket) => {
 
     socket.on('join_user_room', (id) => {
         socket.join(id);
-        console.log(`User manually joined personal room: ${id}`);
     });
 
     socket.on('disconnect', () => {
@@ -89,7 +88,7 @@ io.on('connection', (socket) => {
         }
     });
 
-    // --- 1. APPOINTMENT NOTIFICATIONS ---
+    // 1. APPOINTMENT NOTIFICATIONS
     socket.on('new_appointment_booked', (data) => {
         io.to(data.doctorId).emit('appointment_notification', {
              message: `New Appointment Request from ${data.patientName}`,
@@ -97,10 +96,9 @@ io.on('connection', (socket) => {
         });
     });
 
-    // --- 2. LIVE SESSION ALERTS 📞 ---
+    // 2. LIVE SESSION ALERTS
     socket.on('start_session', (data) => {
         const { patientId, doctorId, doctorName } = data;
-        console.log(`Doctor ${doctorName} starting session with Patient ${patientId}`);
         io.to(patientId).emit('session_request', {
             doctorId: doctorId,
             doctorName: doctorName,
@@ -108,7 +106,7 @@ io.on('connection', (socket) => {
         });
     });
 
-    // --- 3. PHARMACY ORDER UPDATES 💊 ---
+    // 3. PHARMACY ORDER UPDATES
     socket.on('pharmacy_order_update', (data) => {
         const { patientId, status, medicineName } = data;
         io.to(patientId).emit('receive_order_update', {
@@ -118,23 +116,20 @@ io.on('connection', (socket) => {
         });
     });
 
-    // --- 4. CHAT MESSAGING LOGIC ---
+    // 4. CHAT MESSAGING LOGIC
     socket.on('sendMessage', async (data) => {
         try {
-            // Create new message object (Supports attachments now)
             const newMessage = new Chat({
                 senderId: data.senderId,
                 receiverId: data.receiverId,
                 senderRole: data.senderRole,
-                message: data.message || '', // Allow empty message if attachment exists
-                attachmentUrl: data.attachmentUrl || null, // New Field
-                attachmentType: data.attachmentType || 'none', // New Field
+                message: data.message || '', 
+                attachmentUrl: data.attachmentUrl || null, 
+                attachmentType: data.attachmentType || 'none', 
                 timestamp: data.timestamp || Date.now() 
             });
 
-            // Save to Database
             const savedMessage = await newMessage.save();
-            
             const roomId = data.roomId; 
             
             if (roomId) {
@@ -146,7 +141,6 @@ io.on('connection', (socket) => {
                     io.to(receiverSocketId).emit('receiveMessage', savedMessage);
                 }
             }
-
         } catch (error) {
             console.error('Error handling message:', error);
             socket.emit('messageError', { message: 'Failed to send message.' });

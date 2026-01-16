@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MessageSquare, Send, X, Paperclip, Video, FileText, PhoneIncoming, PhoneOff } from 'lucide-react';
+import { MessageSquare, Send, X, Paperclip, Video, FileText, PhoneIncoming, PhoneOff, CheckCheck } from 'lucide-react';
 import api from '../services/api';
 import axios from 'axios';
 import { useSocket } from '../context/SocketContext';
 
-// Helper to ensure consistent Room ID
 const getChatRoomId = (id1, id2) => {
     const sortedIds = [String(id1), String(id2)].sort();
     return `${sortedIds[0]}-${sortedIds[1]}`;
@@ -40,6 +39,7 @@ const ChatWindow = ({ partner, onEndChat, userRole }) => {
             try {
                 const response = await api.get(`/chat/history/${currentUserId}/${partner._id}`);
                 setMessages(response.data);
+                scrollToBottom();
             } catch (error) {
                 console.error("Failed to fetch chat history:", error);
             }
@@ -47,37 +47,25 @@ const ChatWindow = ({ partner, onEndChat, userRole }) => {
         fetchHistory();
     }, [currentUserId, partner._id]);
 
-    // 2. Listen for Incoming Messages & Video Calls
+    // 2. Listen for Incoming Messages (FIXED DUPLICATION)
     useEffect(() => {
         if (!socket || !currentUserId || !partner?._id) return;
 
         socket.emit('join_room', roomId); 
 
         const handleReceiveMessage = (message) => {
+            // FIX 1: Ignore messages sent by ME (because I already added them locally)
+            if (String(message.senderId) === String(currentUserId)) return;
+
             const participantsMatch = 
                 (message.senderId === currentUserId && message.receiverId === partner._id) ||
                 (message.senderId === partner._id && message.receiverId === currentUserId);
 
             if (participantsMatch) {
-                // --- FIX STARTS HERE: DEDUPLICATION LOGIC ---
-                setMessages((prev) => {
-                    // Check if this exact message already exists in state
-                    const isDuplicate = prev.some(m => 
-                        m.timestamp === message.timestamp && 
-                        String(m.senderId) === String(message.senderId) &&
-                        m.message === message.message
-                    );
-
-                    // If it exists, do not add it again
-                    if (isDuplicate) return prev;
-
-                    // If new, add it
-                    return [...prev, message];
-                });
-                // --- FIX ENDS HERE ---
+                setMessages((prev) => [...prev, message]);
 
                 // Detect Incoming Video Call
-                if (message.attachmentType === 'video_call' && String(message.senderId) !== String(currentUserId)) {
+                if (message.attachmentType === 'video_call') {
                     setIncomingVideoCall({
                         meetingId: message.attachmentUrl,
                         senderName: partner.name
@@ -91,11 +79,14 @@ const ChatWindow = ({ partner, onEndChat, userRole }) => {
         return () => {
             socket.off('receiveMessage', handleReceiveMessage);
         };
-    }, [socket, currentUserId, partner._id, roomId, partner.name]);
+    }, [socket, currentUserId, partner._id, roomId]);
 
-    useEffect(scrollToBottom, [messages]);
+    // Auto-scroll on new messages
+    useEffect(() => {
+        scrollToBottom();
+    }, [messages]);
 
-    // --- FILE UPLOAD LOGIC ---
+    // --- FILE UPLOAD ---
     const handleFileSelect = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -123,13 +114,9 @@ const ChatWindow = ({ partner, onEndChat, userRole }) => {
                 roomId: roomId, 
             };
             
-            // Add to local state immediately
+            // Optimistic Update
             setMessages((prev) => [...prev, messageData]);
-            
-            // Send via socket
             socket.emit('sendMessage', messageData);
-            
-            // Save to database
             await api.post('/chat/send', messageData);
         } catch (err) {
             alert("Failed to upload file.");
@@ -139,10 +126,9 @@ const ChatWindow = ({ partner, onEndChat, userRole }) => {
         }
     };
 
-    // --- VIDEO CALL LOGIC ---
+    // --- VIDEO CALL ---
     const startVideoCall = () => {
         const meetingId = `HealthBridge-${Date.now()}`;
-        
         const messageData = {
             senderId: currentUserId,
             receiverId: partner._id,
@@ -154,12 +140,9 @@ const ChatWindow = ({ partner, onEndChat, userRole }) => {
             roomId: roomId, 
         };
         
-        // Add to local state
         setMessages((prev) => [...prev, messageData]);
-        
-        // Send via socket and save to database
         socket.emit('sendMessage', messageData);
-        api.post('/chat/send', messageData).catch(err => console.error('Failed to save video call message:', err));
+        api.post('/chat/send', messageData).catch(err => console.error(err));
         
         setVideoRoomId(meetingId);
         setShowVideoModal(true);
@@ -171,15 +154,6 @@ const ChatWindow = ({ partner, onEndChat, userRole }) => {
             setShowVideoModal(true);
             setIncomingVideoCall(null);
         }
-    };
-
-    const declineVideoCall = () => {
-        setIncomingVideoCall(null);
-    };
-
-    const joinVideoCallManual = (meetingId) => {
-        setVideoRoomId(meetingId);
-        setShowVideoModal(true);
     };
 
     const sendMessage = async (e) => {
@@ -197,17 +171,17 @@ const ChatWindow = ({ partner, onEndChat, userRole }) => {
             roomId: roomId, 
         };
 
-        // Add message to local state immediately for real-time display
+        // 1. Add to local UI immediately
         setMessages((prev) => [...prev, messageData]);
         
-        // Send to backend and other user
+        // 2. Send to Server (Server will broadcast to partner)
         socket.emit('sendMessage', messageData);
         
-        // Also save to backend database
+        // 3. Save to DB
         try {
             await api.post('/chat/send', messageData);
         } catch (err) {
-            console.error('Failed to save message to database:', err);
+            console.error('Failed to save message:', err);
         }
         
         setInput('');
@@ -233,7 +207,6 @@ const ChatWindow = ({ partner, onEndChat, userRole }) => {
         return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     };
 
-    // --- RENDER HELPERS ---
     const renderAttachment = (url, type) => {
         if (type === 'video_call') {
             return (
@@ -242,13 +215,14 @@ const ChatWindow = ({ partner, onEndChat, userRole }) => {
                         <Video className="w-6 h-6 text-indigo-600" />
                     </div>
                     <p className="text-sm font-bold text-indigo-800 mb-2">Video Consultation Invite</p>
-                    <button onClick={() => joinVideoCallManual(url)} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700 transition w-full">Join Call</button>
+                    <button onClick={() => { setVideoRoomId(url); setShowVideoModal(true); }} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700 transition w-full">Join Call</button>
                 </div>
             );
         }
         const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
         const baseURL = isLocalhost ? 'http://localhost:5000' : `http://${window.location.hostname}:5000`;
-        const fullUrl = `${baseURL}${url}`;
+        const fullUrl = url.startsWith('http') ? url : `${baseURL}${url}`;
+        
         if (type === 'image') {
             return (
                 <div className="mb-2 rounded-lg overflow-hidden border border-gray-200">
@@ -267,79 +241,73 @@ const ChatWindow = ({ partner, onEndChat, userRole }) => {
     };
 
     return (
-        <div className="flex flex-col h-full bg-white rounded-3xl shadow-xl border border-gray-200 overflow-hidden relative">
+        // KEY FIX: 'h-full' and 'min-h-0' are crucial for nested flex scrolling
+        <div className="flex flex-col h-full min-h-0 bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden relative">
             
-            {/* --- INCOMING CALL POPUP --- */}
+            {/* INCOMING CALL MODAL */}
             {incomingVideoCall && !showVideoModal && (
-                <div className="absolute inset-0 z-40 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center text-white animate-in fade-in zoom-in duration-300">
+                <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center text-white animate-in fade-in zoom-in duration-300">
                     <div className="w-24 h-24 bg-green-500 rounded-full flex items-center justify-center mb-6 animate-bounce shadow-[0_0_30px_rgba(34,197,94,0.6)]">
                         <PhoneIncoming className="w-12 h-12 text-white" />
                     </div>
                     <h2 className="text-3xl font-bold mb-2">{incomingVideoCall.senderName}</h2>
                     <p className="text-gray-300 mb-10 text-lg">is requesting a video call...</p>
                     <div className="flex gap-8">
-                        <button onClick={declineVideoCall} className="flex flex-col items-center gap-2 group"><div className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center transition transform group-hover:scale-110 group-hover:bg-red-600"><PhoneOff className="w-8 h-8" /></div><span className="text-sm font-medium text-gray-300">Decline</span></button>
+                        <button onClick={() => setIncomingVideoCall(null)} className="flex flex-col items-center gap-2 group"><div className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center transition transform group-hover:scale-110 group-hover:bg-red-600"><PhoneOff className="w-8 h-8" /></div><span className="text-sm font-medium text-gray-300">Decline</span></button>
                         <button onClick={acceptVideoCall} className="flex flex-col items-center gap-2 group"><div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center transition transform group-hover:scale-110 group-hover:bg-green-600 animate-pulse"><Video className="w-8 h-8" /></div><span className="text-sm font-medium text-gray-300">Accept</span></button>
                     </div>
                 </div>
             )}
 
-            {/* --- VIDEO MODAL --- */}
+            {/* VIDEO ROOM MODAL */}
             {showVideoModal && videoRoomId && (
                 <div className="absolute inset-0 z-50 bg-black flex flex-col">
-                    <div className="flex justify-between items-center p-4 bg-gray-900 text-white">
-                        <span className="font-bold flex items-center gap-2 text-sm md:text-base">
-                            <span className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></span>
-                            Live Consultation
-                        </span>
-                        {isDoctor && (
-                            <div className="hidden md:block text-xs bg-yellow-600 text-black px-2 py-1 rounded font-bold">
-                                Doctor: Please "Log in" below to start the room.
-                            </div>
-                        )}
+                    <div className="flex justify-between items-center p-4 bg-gray-900 text-white shrink-0">
+                        <span className="font-bold flex items-center gap-2 text-sm md:text-base"><span className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></span> Live Consultation</span>
                         <button onClick={() => setShowVideoModal(false)} className="bg-red-600 hover:bg-red-700 text-white px-4 py-1 rounded text-sm font-bold">End Call</button>
                     </div>
-                    
-                    <iframe 
-                        allow="camera; microphone; fullscreen; display-capture; autoplay"
-                        src={`https://meet.jit.si/${videoRoomId}?config.prejoinPageEnabled=false&userInfo.displayName=${encodeURIComponent(currentUser.name)}`} 
-                        className="flex-1 w-full h-full border-none"
-                        title="Video Call"
-                    ></iframe>
+                    <iframe allow="camera; microphone; fullscreen; display-capture; autoplay" src={`https://meet.jit.si/${videoRoomId}?config.prejoinPageEnabled=false&userInfo.displayName=${encodeURIComponent(currentUser.name)}`} className="flex-1 w-full h-full border-none" title="Video Call"></iframe>
                 </div>
             )}
 
-            {/* Header */}
-            <div className="p-4 bg-gradient-to-r from-gray-50 to-white border-b flex justify-between items-center">
+            {/* HEADER */}
+            <div className="px-6 py-4 bg-white border-b border-gray-100 flex justify-between items-center shrink-0">
                 <div className="flex items-center space-x-3">
                     <div className="relative">
                         <img src={partner.image || "https://cdn-icons-png.flaticon.com/512/377/377429.png"} alt={partner.name} className="w-10 h-10 rounded-full border border-gray-200 object-cover" />
                         <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${isConnected ? 'bg-green-500' : 'bg-gray-400'}`}></span>
                     </div>
                     <div>
-                        <h3 className="text-lg font-bold text-gray-800">{partner.name}</h3>
-                        <span className="text-xs text-gray-500 flex items-center">{isConnected ? 'Online' : 'Connecting...'}</span>
+                        <h3 className="text-lg font-bold text-gray-800 leading-tight">{partner.name}</h3>
+                        <span className="text-xs text-green-600 font-medium flex items-center gap-1">{isConnected ? 'Online' : 'Connecting...'}</span>
                     </div>
                 </div>
                 <div className="flex gap-2">
-                    <button onClick={startVideoCall} className="p-2 bg-indigo-50 text-indigo-600 rounded-full hover:bg-indigo-100 transition" title="Start Video Call"><Video className="w-5 h-5" /></button>
-                    <button onClick={handleEndChat} className="p-2 bg-red-50 text-red-500 rounded-full hover:bg-red-100 transition" title="End Chat"><X className="w-5 h-5" /></button>
+                    <button onClick={startVideoCall} className="p-2.5 bg-indigo-50 text-indigo-600 rounded-full hover:bg-indigo-100 transition shadow-sm"><Video className="w-5 h-5" /></button>
+                    <button onClick={handleEndChat} className="p-2.5 bg-red-50 text-red-500 rounded-full hover:bg-red-100 transition shadow-sm"><X className="w-5 h-5" /></button>
                 </div>
             </div>
 
-            {/* Messages Area */}
-            <div className="flex-grow p-4 overflow-y-auto space-y-4 bg-gray-50/50">
+            {/* MESSAGES AREA - FIXED SCROLLING */}
+            {/* min-h-0 is the magic CSS property that stops flex children from overflowing parent */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50/80 min-h-0 custom-scrollbar">
                 {messages.length === 0 && (
-                    <div className="text-center text-gray-400 mt-10"><MessageSquare className="w-10 h-10 mx-auto mb-2 opacity-20" /><p className="text-sm">No messages yet. Share a report or say hi!</p></div>
+                    <div className="flex flex-col items-center justify-center h-full text-gray-400 opacity-50">
+                        <MessageSquare className="w-12 h-12 mb-2" />
+                        <p className="text-sm font-medium">No messages yet. Start the conversation!</p>
+                    </div>
                 )}
                 {messages.map((msg, index) => {
                     const isMe = String(msg.senderId) === String(currentUserId);
                     return (
-                        <div key={msg._id || index} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                            <div className={`max-w-[75%] p-3 rounded-2xl shadow-sm relative ${isMe ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-white text-gray-800 border border-gray-100 rounded-bl-none'}`}>
+                        <div key={msg._id || index} className={`flex ${isMe ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2 fade-in duration-300`}>
+                            <div className={`max-w-[75%] p-3.5 rounded-2xl shadow-sm relative text-sm ${isMe ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-white text-gray-800 border border-gray-100 rounded-bl-none'}`}>
                                 {msg.attachmentUrl && renderAttachment(msg.attachmentUrl, msg.attachmentType)}
-                                {msg.message && <p className="text-sm leading-relaxed">{msg.message}</p>}
-                                <span className={`text-[10px] mt-1 block text-right ${isMe ? 'text-indigo-200' : 'text-gray-400'}`}>{formatTime(msg.timestamp)}</span>
+                                {msg.message && <p className="leading-relaxed">{msg.message}</p>}
+                                <div className={`flex items-center justify-end gap-1 mt-1 ${isMe ? 'text-indigo-200' : 'text-gray-400'}`}>
+                                    <span className="text-[10px]">{formatTime(msg.timestamp)}</span>
+                                    {isMe && <CheckCheck className="w-3 h-3" />}
+                                </div>
                             </div>
                         </div>
                     );
@@ -347,14 +315,26 @@ const ChatWindow = ({ partner, onEndChat, userRole }) => {
                 <div ref={messagesEndRef} />
             </div>
 
-            {/* Input Area */}
-            <form onSubmit={sendMessage} className="p-4 bg-white border-t flex items-center space-x-3">
+            {/* INPUT AREA */}
+            <form onSubmit={sendMessage} className="p-4 bg-white border-t border-gray-100 flex items-center gap-3 shrink-0">
                 <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileSelect} accept="image/*,application/pdf" />
-                <button type="button" onClick={() => fileInputRef.current.click()} disabled={isUploading || !isConnected} className="p-3 bg-gray-100 text-gray-500 rounded-xl hover:bg-gray-200 transition disabled:opacity-50" title="Attach Medical Report">
+                
+                <button type="button" onClick={() => fileInputRef.current.click()} disabled={isUploading || !isConnected} className="p-3 bg-gray-50 text-gray-500 rounded-xl hover:bg-gray-100 transition border border-gray-200" title="Attach File">
                     {isUploading ? <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div> : <Paperclip className="w-5 h-5" />}
                 </button>
-                <input type="text" value={input} onChange={(e) => setInput(e.target.value)} placeholder={isUploading ? "Uploading..." : "Type your message..."} className="flex-grow px-4 py-3 bg-gray-50 border-transparent focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 rounded-xl transition-all outline-none" disabled={!isConnected || isUploading} />
-                <button type="submit" className="bg-indigo-600 text-white p-3 rounded-xl hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-transform transform active:scale-95 shadow-lg shadow-indigo-200" disabled={!isConnected || (input.trim() === '' && !isUploading)}><Send className="w-5 h-5" /></button>
+                
+                <input 
+                    type="text" 
+                    value={input} 
+                    onChange={(e) => setInput(e.target.value)} 
+                    placeholder={isUploading ? "Uploading..." : "Type your message..."} 
+                    className="flex-grow px-4 py-3 bg-gray-50 border-transparent focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 rounded-xl transition-all outline-none text-sm font-medium placeholder-gray-400"
+                    disabled={!isConnected || isUploading} 
+                />
+                
+                <button type="submit" disabled={!isConnected || (input.trim() === '' && !isUploading)} className="bg-indigo-600 text-white p-3 rounded-xl hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-transform transform active:scale-95 shadow-md shadow-indigo-200">
+                    <Send className="w-5 h-5" />
+                </button>
             </form>
         </div>
     );

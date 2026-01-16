@@ -5,11 +5,11 @@ const auth = require('../middleware/auth');
 
 // --- PUBLIC ROUTES ---
 
-// 1. THIS WAS MISSING -> Fixes the 404 Error
+// 1. Get all doctors (with optional filters)
 // @route GET /api/doctor
 router.get('/', doctorController.getAllDoctors); 
 
-// 2. Get specific doctor details
+// 2. Get specific doctor details (Now includes reviews!)
 // @route GET /api/doctor/profile/:id
 router.get('/profile/:id', doctorController.getDoctorProfileById);
 
@@ -27,5 +27,9 @@ router.post('/login', doctorController.loginDoctor);
 // 5. Update doctor status
 // @route PUT /api/doctor/status
 router.put('/status', auth, doctorController.updateStatus);
+
+// 6. NEW: Add a Review
+// @route POST /api/doctor/review
+router.post('/review', auth, doctorController.addReview); // <--- ADDED THIS
 
 module.exports = router;

@@ -12,17 +12,18 @@ import PatientLogin from './pages/PatientLogin';
 import PatientRegister from './pages/PatientRegister';
 import PatientDashboard from './pages/PatientDashboard';
 import FindDoctors from './pages/FindDoctors';
-import ReportAnalysis from './pages/ReportAnalysis';
+import ReportAnalysis from './pages/ReportAnalysis'; // Keep this for your ML Model
 import MapPage from './pages/MapPage';
 import Chat from './pages/chat';
 import PharmacyLogin from './pages/PharmacyLogin';
 import PharmacyRegister from './pages/PharmacyRegister';
 import PharmacyDashboard from './pages/PharmacyDashboard';
 
-// --- NEW PAGES (Added) ---
+// --- NEW PAGES ---
 import MedicalHistory from './pages/MedicalHistory';
 import PharmacyCatalog from './pages/PharmacyCatalog';
-import AIHealthAssistant from './pages/AIHealthAssistant'; // <--- ADDED IMPORT HERE
+import AIHealthAssistant from './pages/AIHealthAssistant'; 
+import MedicalReportDecoder from './pages/MedicalReportDecoder'; // <--- Imported here
 import HospitalLogin from './pages/HospitalLogin';
 import HospitalRegister from './pages/HospitalRegister';
 import HospitalDashboard from './pages/HospitalDashboard';
@@ -59,7 +60,13 @@ const App = () => {
                     <Route path="/patient/register" element={<PatientRegister />} />
                     <Route path="/patient/dashboard" element={<ProtectedRoute role="patient"><PatientDashboard /></ProtectedRoute>} />
                     <Route path="/patient/doctors" element={<ProtectedRoute role="patient"><FindDoctors /></ProtectedRoute>} />
+                    
+                    {/* YOUR ML MODEL (Existing) */}
                     <Route path="/patient/report-analysis" element={<ProtectedRoute role="patient"><ReportAnalysis /></ProtectedRoute>} />
+                    
+                    {/* NEW AI DECODER (Generative AI) - ADDED THIS LINE */}
+                    <Route path="/patient/report-decoder" element={<ProtectedRoute role="patient"><MedicalReportDecoder /></ProtectedRoute>} />
+
                     <Route path="/patient/map" element={<ProtectedRoute role="patient"><MapPage /></ProtectedRoute>} />
                     <Route path="/patient/chat/:doctorId" element={<ProtectedRoute role="patient"><Chat /></ProtectedRoute>} />
                     

@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const Doctor = require('../models/Doctor'); 
+const Review = require('../models/Review'); // <--- IMPORT REVIEW MODEL
 const { doctorRegisterValidation, doctorLoginValidation } = require('../validations/doctorValidation');
 
 // Shared function to generate JWT
@@ -12,8 +13,6 @@ const generateToken = (id) => {
 
 // POST /doctor/register
 exports.registerDoctor = async (req, res) => {
-  // Note: You might need to update your Joi validation schema in 'doctorValidation.js' 
-  // to allow these new fields (about, experience, etc.) or just validate the basics.
   const { error } = doctorRegisterValidation.validate(req.body, { allowUnknown: true });
   if (error) return res.status(400).send({ message: error.details[0].message });
 
@@ -30,11 +29,10 @@ exports.registerDoctor = async (req, res) => {
       password: hashedPassword,
       specialization: req.body.specialization,
       fees: req.body.fees,
-      // NEW FIELDS added from Model update
       experience: req.body.experience,
       about: req.body.about,
       image: req.body.image,
-      availableSlots: req.body.availableSlots || [] // Empty array if not provided
+      availableSlots: req.body.availableSlots || [] 
     });
     
     const savedDoctor = await doctor.save();
@@ -77,7 +75,7 @@ exports.loginDoctor = async (req, res) => {
         email: doctor.email, 
         specialization: doctor.specialization, 
         status: doctor.status,
-        image: doctor.image // sending image back on login is helpful
+        image: doctor.image 
       },
     });
   } catch (err) {
@@ -123,17 +121,15 @@ exports.updateStatus = async (req, res) => {
 // --- GET ALL DOCTORS WITH FILTERS ---
 exports.getAllDoctors = async (req, res) => {
     try {
-        const { category, search } = req.query; // Capture query params
+        const { category, search } = req.query; 
         let query = {};
 
-        // 1. Filter by Category (Specialization)
         if (category && category !== 'All' && category !== '') {
             query.specialization = category;
         }
 
-        // 2. Filter by Name Search (Optional logic if you add a search bar later)
         if (search) {
-             query.name = { $regex: search, $options: 'i' }; // Case-insensitive search
+             query.name = { $regex: search, $options: 'i' }; 
         }
 
         const doctors = await Doctor.find(query).select('-password');
@@ -147,16 +143,65 @@ exports.getAllDoctors = async (req, res) => {
 // --- GET SINGLE DOCTOR PROFILE ---
 exports.getDoctorProfileById = async (req, res) => {
     try {
+        // Fetch doctor info
         const doctor = await Doctor.findById(req.params.id).select('-password');
-        if (!doctor) {
-            return res.status(404).json({ msg: 'Doctor not found' });
-        }
-        res.json(doctor);
+        if (!doctor) return res.status(404).json({ msg: 'Doctor not found' });
+
+        // Fetch recent reviews for this doctor (limit to 5 for now)
+        const reviews = await Review.find({ doctorId: doctor._id })
+            .sort({ timestamp: -1 })
+            .limit(5);
+
+        // Combine them
+        const profileData = {
+            ...doctor.toObject(),
+            reviews: reviews
+        };
+
+        res.json(profileData);
     } catch (err) {
         console.error(err.message);
         if (err.kind === 'ObjectId') {
              return res.status(404).json({ msg: 'Doctor not found (invalid ID format)' });
         }
         res.status(500).send('Server Error');
+    }
+};
+
+// --- NEW: ADD REVIEW & UPDATE RATING ---
+exports.addReview = async (req, res) => {
+    try {
+        const { doctorId, rating, comment } = req.body;
+        const patientId = req.user.id; 
+        const patientName = req.user.name || "Anonymous Patient"; // Assuming Auth middleware adds name
+
+        // 1. Create Review
+        const newReview = new Review({
+            doctorId,
+            patientId,
+            patientName,
+            rating,
+            comment
+        });
+
+        await newReview.save();
+
+        // 2. Recalculate Average Rating for Doctor
+        const reviews = await Review.find({ doctorId });
+        const totalRatings = reviews.length;
+        const sumRatings = reviews.reduce((acc, curr) => acc + curr.rating, 0);
+        const averageRating = (sumRatings / totalRatings).toFixed(1); // e.g., "4.5"
+
+        // 3. Update Doctor Document
+        await Doctor.findByIdAndUpdate(doctorId, {
+            averageRating: averageRating,
+            totalRatings: totalRatings
+        });
+
+        res.json({ success: true, message: "Review added successfully", newRating: averageRating });
+
+    } catch (err) {
+        console.error("Add Review Error:", err);
+        res.status(500).json({ success: false, message: "Failed to add review" });
     }
 };

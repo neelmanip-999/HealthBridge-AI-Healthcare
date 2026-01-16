@@ -15,7 +15,7 @@ const server = http.createServer(app);
 // Setup Socket.IO with CORS
 const io = new Server(server, {
     cors: {
-        origin: "http://localhost:5173", // Your React app's URL
+        origin: "http://localhost:5173", // React Frontend URL
         methods: ["GET", "POST", "PUT", "DELETE"],
     }
 });
@@ -38,26 +38,29 @@ const doctorRoutes = require('./routes/doctor');
 const patientRoutes = require('./routes/patient');
 const chatRoutes = require('./routes/chat');
 const appointmentRoutes = require('./routes/appointment');
-const reportAnalysisRoutes = require('./routes/reportAnalysis');
 const pharmacyRoutes = require('./routes/pharmacy');
 const hospitalRoutes = require('./routes/hospital');
 const hospitalAuthRoutes = require('./routes/hospitalAuth');
 
-// --- NEW: Import AI Routes ---
-const aiRoutes = require('./routes/aiAssistant'); // <--- ADDED THIS
+// --- FIXED IMPORTS ---
+// 1. Report Analysis Route
+const reportAnalysisRoutes = require('./routes/reportAnalysis'); 
+
+// 2. FIXED: Pointing to your existing 'aiAssistant.js' file
+const aiRoutes = require('./routes/aiAssistant'); 
 
 // --- API Endpoints ---
 app.use('/api/doctor', doctorRoutes);
 app.use('/api/patient', patientRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/appointments', appointmentRoutes);
-app.use('/api/reports', reportAnalysisRoutes);
 app.use('/api/pharmacy', pharmacyRoutes);
 app.use('/api/hospitals', hospitalRoutes);
 app.use('/api/hospital-auth', hospitalAuthRoutes);
 
-// --- NEW: Use AI Routes ---
-app.use('/api/ai', aiRoutes); // <--- ADDED THIS (Enables /api/ai/ask and /api/ai/summarize)
+// --- FIXED ENDPOINTS ---
+app.use('/api/reports', reportAnalysisRoutes); 
+app.use('/api/ai', aiRoutes);                  
 
 // --- SOCKET.IO LOGIC ---
 const userSocketMap = {}; // { userId: socketId }

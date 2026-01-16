@@ -1,0 +1,56 @@
+2026-01-16 06:25:18,348 - __main__ - INFO - Loading data from New_dataset.csv...
+2026-01-16 06:25:18,438 - __main__ - INFO - Dataset shape: (30000, 14)
+2026-01-16 06:25:18,439 - __main__ - INFO - Columns: ['Age', 'Gender', 'BloodPressure', 'Cholesterol', 'Glucose', 'HeartRate', 'BMI', 'Fever', 'Cough', 'Fatigue', 'Headache', 'Nausea', 'ShortnessBreath', 'Disease']
+2026-01-16 06:25:18,439 - __main__ - INFO - Preprocessing data...
+2026-01-16 06:25:18,441 - __main__ - INFO - Detecting and handling outliers...
+2026-01-16 06:25:18,496 - __main__ - INFO - Engineering features...
+2026-01-16 06:25:18,614 - __main__ - INFO - Starting model training...
+2026-01-16 06:25:18,639 - __main__ - INFO - Training final model...
+2026-01-16 06:25:20,161 - __main__ - INFO - Evaluating model...
+2026-01-16 06:25:20,561 - __main__ - INFO - 
+============================================================
+2026-01-16 06:25:20,562 - __main__ - INFO - Test Set Metrics:
+2026-01-16 06:25:20,563 - __main__ - INFO -   accuracy: 1.0000
+2026-01-16 06:25:20,563 - __main__ - INFO -   precision: 1.0000
+2026-01-16 06:25:20,564 - __main__ - INFO -   recall: 1.0000
+2026-01-16 06:25:20,565 - __main__ - INFO -   f1_score: 1.0000
+2026-01-16 06:25:20,565 - __main__ - INFO -   precision_macro: 1.0000
+2026-01-16 06:25:20,566 - __main__ - INFO -   recall_macro: 1.0000
+2026-01-16 06:25:20,567 - __main__ - INFO -   f1_macro: 1.0000
+2026-01-16 06:25:20,568 - __main__ - INFO - ============================================================
+2026-01-16 06:25:20,568 - __main__ - INFO - 
+Classification Report:
+2026-01-16 06:25:20,603 - __main__ - INFO - 
+              precision    recall  f1-score   support
+
+           0       1.00      1.00      1.00       295
+           1       1.00      1.00      1.00      1712
+           2       1.00      1.00      1.00      2831
+           3       1.00      1.00      1.00      1162
+
+    accuracy                           1.00      6000
+   macro avg       1.00      1.00      1.00      6000
+weighted avg       1.00      1.00      1.00      6000
+
+2026-01-16 06:25:20,720 - __main__ - INFO - 
+Top 10 Most Important Features:
+2026-01-16 06:25:20,721 - __main__ - INFO -   1. Glucose: 0.2908
+2026-01-16 06:25:20,722 - __main__ - INFO -   2. Cholesterol: 0.2637
+2026-01-16 06:25:20,723 - __main__ - INFO -   3. BloodPressure: 0.2492
+2026-01-16 06:25:20,724 - __main__ - INFO -   4. Disease: 0.0982
+2026-01-16 06:25:20,724 - __main__ - INFO -   5. BMI_Cholesterol_Interaction: 0.0522
+2026-01-16 06:25:20,725 - __main__ - INFO -   6. Age_BP_Interaction: 0.0211
+2026-01-16 06:25:20,726 - __main__ - INFO -   7. BMI: 0.0118
+2026-01-16 06:25:20,726 - __main__ - INFO -   8. Age: 0.0067
+2026-01-16 06:25:20,727 - __main__ - INFO -   9. HeartRate: 0.0026
+2026-01-16 06:25:20,728 - __main__ - INFO -   10. Cough: 0.0008
+2026-01-16 06:25:20,977 - __main__ - INFO - Model saved to models\patient_report_model.joblib
+2026-01-16 06:25:20,980 - __main__ - INFO - Scaler saved to models\scaler.joblib
+2026-01-16 06:25:20,983 - __main__ - INFO - Label encoders saved to models\label_encoders.joblib
+2026-01-16 06:25:21,109 - __main__ - INFO - Metadata saved to models\model_metadata.json
+2026-01-16 06:25:21,110 - __main__ - INFO - 
+============================================================
+2026-01-16 06:25:21,111 - __main__ - INFO - [SUCCESS] Model training completed successfully!
+2026-01-16 06:25:21,112 - __main__ - INFO - Test Accuracy: 1.0000
+2026-01-16 06:25:21,113 - __main__ - INFO - Test F1 Score: 1.0000
+2026-01-16 06:25:21,114 - __main__ - INFO - ============================================================

@@ -42,7 +42,8 @@ def root():
         'endpoints': {
             'health': '/health',
             'predict': '/predict (POST)',
-            'batch_predict': '/predict/batch (POST)'
+            'batch_predict': '/predict/batch (POST)',
+            'model_info': '/model/info (GET)'
         },
         'model_loaded': predictor is not None
     })
@@ -110,6 +111,54 @@ def predict_batch():
         return jsonify({
             'status': 'success',
             'results': results
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@app.route('/model/info', methods=['GET'])
+def model_info():
+    """Get model metadata and information"""
+    if predictor is None:
+        return jsonify({
+            'status': 'error',
+            'message': 'Model not loaded'
+        }), 500
+    
+    try:
+        import json
+        import os
+        
+        metadata_path = os.path.join(MODEL_DIR, 'model_metadata.json')
+        if os.path.exists(metadata_path):
+            with open(metadata_path, 'r') as f:
+                metadata = json.load(f)
+        else:
+            metadata = {}
+        
+        # Get feature importance if available
+        feature_importance = {}
+        if hasattr(predictor.model, 'feature_importances_'):
+            feature_importance = dict(zip(
+                predictor.feature_names,
+                predictor.model.feature_importances_.tolist()
+            ))
+            # Sort by importance
+            feature_importance = dict(sorted(
+                feature_importance.items(),
+                key=lambda x: x[1],
+                reverse=True
+            ))
+        
+        return jsonify({
+            'status': 'success',
+            'model_loaded': True,
+            'metadata': metadata,
+            'feature_importance': feature_importance,
+            'n_features': len(predictor.feature_names) if predictor.feature_names else 0
         })
         
     except Exception as e:

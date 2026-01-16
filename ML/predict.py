@@ -67,6 +67,21 @@ class ReportPredictor:
         else:
             df = data.copy()
         
+        # Feature engineering (same as training)
+        if 'Age' in df.columns and 'BloodPressure' in df.columns:
+            df['Age_BP_Interaction'] = df['Age'] * df['BloodPressure']
+        
+        if 'BMI' in df.columns and 'Cholesterol' in df.columns:
+            df['BMI_Cholesterol_Interaction'] = df['BMI'] * df['Cholesterol']
+        
+        # Create risk score features
+        if all(col in df.columns for col in ['BloodPressure', 'Cholesterol', 'Glucose']):
+            df['Cardiovascular_Risk'] = (
+                (df['BloodPressure'] > 140).astype(int) +
+                (df['Cholesterol'] > 200).astype(int) +
+                (df['Glucose'] > 100).astype(int)
+            )
+        
         # Ensure all required features are present
         missing_features = set(self.feature_names) - set(df.columns)
         if missing_features:
